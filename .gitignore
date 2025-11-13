@@ -1,0 +1,50 @@
+# ===================================================================
+# General
+# ===================================================================
+# OS-specific
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===================================================================
+# Visual Studio / C++
+# ===================================================================
+# Build output directories
+[Rr]elease/
+[Dd]ebug/
+x64/
+Win32/
+
+# Compiled files and intermediates
+*.dll
+*.lib
+*.pdb
+*.obj
+*.ilk
+*.exp
+*.pch
+*.tlog
+*.log
+
+# User-specific files
+*.sln.user
+*.vcxproj.user
+.vs/
+
+# ===================================================================
+# Python
+# ===================================================================
+# Virtual environment
+# We name our venv 'tesis', but this covers common names
+tesis/
+venv/
+env/
+
+# Bytecode cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE files
+.idea/
+.vscode/

@@ -1,0 +1,76 @@
+import dearpygui.dearpygui as dpg
+import asyncio
+import threading
+import queue
+from server_handler import start_server
+from widgets.pos_widget import update_pos_display
+from tabs.kinematics_tab import create_kinematics_tab
+
+# --- GUI Setup ---
+dpg.create_context()
+
+with dpg.window(label="erishito puede sher", tag="primary_window", width=800, height=600):
+    #dpg.add_text("Falcon Haptic Device Interface")py --
+    #dpg.add_spacer()
+    # Create a tab bar that will hold all the main tabs
+    with dpg.tab_bar(tag="main_tab_bar"):
+        # Call the function from your tab file to create the Kinematics tab
+        # and all its contents
+        create_kinematics_tab(parent_tab_bar="main_tab_bar")
+
+        # Placeholder tab
+        with dpg.tab(label="Placeholder tab"):
+            dpg.add_text("This is the Settings tab")
+
+# --- Server and threading setup ---
+
+# 1. Create the thread-safe queue that will be shared between the server and GUI
+# The server thread will 'put' data into it, and the GUI thread will 'get' data from it.
+data_queue = queue.Queue()
+
+def run_server_in_thread() -> None:
+    """
+    This function is the target for our background thread.
+    It creates and runs the asyncio event loop for the server.
+    """
+    print("Starting server thread...")
+    try:
+        asyncio.run(start_server(data_queue))
+    except Exception as e:
+        print(f"Error in server thread: {e}")
+
+# 2. Start the server in a separate thread.
+# By setting 'daemon=True', the thread will automatically shut down
+# when the main program (the GUI) exits.
+print("Setting up server thread...")
+server_thread = threading.Thread(target=run_server_in_thread, daemon=True)
+server_thread.start()
+print("Server thread started.")
+
+# --- DearPyGUI Main Loop ---
+dpg.create_viewport(title='GUI Control Panel', width=800, height=600)
+dpg.setup_dearpygui()
+dpg.show_viewport()
+dpg.set_primary_window("primary_window", True)
+
+print("Starting DearPyGUI render loop...")
+while dpg.is_dearpygui_running():
+    # 3. On every frame, check the queue for new data from the server thread
+    try:
+        # 'get_nowait()' is non-blocking. It gets an item if one is inmediately
+        # available, otherwise, it raises a queue.Empty exception
+        x, y, z = data_queue.get_nowait()
+
+        # If we successfully got data, update the display
+        # This is the ONLY place you should call GUI update functions.
+        update_pos_display(x, y, z)
+
+    except queue.Empty:
+        # This is the nomal case when no new data has arrived since the last frame
+        # We simply do nothing and continue on to rendering
+        pass
+
+    dpg.render_dearpygui_frame()
+
+print("DearPyGUI render loop finished.")
+dpg.destroy_context()
