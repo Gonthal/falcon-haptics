@@ -11,7 +11,7 @@ SOCKET FalconClientSocket = INVALID_SOCKET;
 static const char* init_message = "Hello, Falcon!";
 FILE* pDebugLogFile = NULL;
 
-Position current_position = { 0.0f, 0.0f, 0.0f };
+Position current_position = { 0.0, 0.0, 0.0 };
 
 SQRESULT SQ_debugLog_open(HSQUIRRELVM v) {
 	pDebugLogFile = fopen("tesis_log.txt", "w");
@@ -70,11 +70,10 @@ SQRESULT SQ_sendPosition(HSQUIRRELVM v, SQFloat posx, SQFloat posy, SQFloat posz
 SQ_BIND_GLOBAL_METHOD(sendPosition);
 
 SQRESULT SQ_getCommand(HSQUIRRELVM v) {
-	FalconCommand cmd_handler;
-	//MsgHeader hdr = ReceiveCommand(&FalconClientSocket, &cmd_handler);
+	MsgHeader incoming_cmd = GetCommand(&FalconClientSocket);
 
-	//printf("[SQ_getCommand] Success! Command is %d and len is %d\n", hdr.type, hdr.len);
-	printf("[SQ_getCommand] dummy text.\n");
+	sq_pushinteger(v, incoming_cmd.type);
+	sq_pushinteger(v, incoming_cmd.len);
 	return SQ_OK;
 }
 SQ_BIND_GLOBAL_METHOD(getCommand);

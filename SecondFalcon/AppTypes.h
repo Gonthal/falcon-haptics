@@ -25,14 +25,14 @@ enum : uint16_t {
 };
 
 // 
-typedef enum : uint16_t {
+typedef enum _FalconCommand : uint16_t {
 	CMD_IDLE = 0,
-	CMD_PRINT_STATUS = 1
+	CMD_PRINT_STATUS = 1,
+	CMD_ERROR = 100
 } FalconCommand;
 
 #pragma pack(push, 1) // Ensure no padding is added by the compiler
 typedef struct _MsgHeader {
-	//uint16_t type;   // network order
 	FalconCommand type;	  // network order
 	uint16_t      len;    // payload length in bytes, network order
 } MsgHeader;

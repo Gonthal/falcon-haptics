@@ -19,7 +19,8 @@ static SOCKET g_ClientSocket = INVALID_SOCKET;
 
 // Thread-safe queues (use the class defined in the header)
 static ThreadSafeQueue<Position> sending_pos_q;
-static ThreadSafeQueue<FalconCommand> incoming_cmd_q;
+static ThreadSafeQueue<Position> incoming_pos_q;
+static ThreadSafeQueue<MsgHeader> incoming_cmd_hdr_q;
 
 /******************************************************************/
 /* UTILITY FUNCTIONS DECLARATIONS                                 */
@@ -102,18 +103,20 @@ static void receiver_loop() {
         int r = recv_all(g_ClientSocket, reinterpret_cast<char*>(&hdr), sizeof(hdr));
         if (r <= 0) {
             // connection closed or error
-            printf("[receiver_loop] hader recv returned %d (error: %d)\n", r, WSAGetLastError());
+            printf("[receiver_loop] header recv returned %d (error: %d)\n", r, WSAGetLastError());
             should_threads_run.store(false);
             break;
         }
 
-        uint16_t type = ntohs(hdr.type);
-        uint16_t len = ntohs(hdr.len);
+        hdr.type = (FalconCommand) ntohs(hdr.type);
+        hdr.len = ntohs(hdr.len);
+
+        incoming_cmd_hdr_q.push(hdr);
 
         std::vector<char> payload;
-        if (len > 0) {
-            payload.resize(len);
-            r = recv_all(g_ClientSocket, payload.data(), len);
+        if (hdr.len > 0) {
+            payload.resize(hdr.len);
+            r = recv_all(g_ClientSocket, payload.data(), hdr.len);
             if (r <= 0) {
                 printf("[receiver_loop] payload recv returned %d (error: %d)\n", r, WSAGetLastError());
                 should_threads_run.store(false);
@@ -121,9 +124,9 @@ static void receiver_loop() {
             }
         }
 
-        printf("[receiver_loop] Received message type %d, length %d\n", type, len);
+        printf("[receiver_loop] Received message type %d, length %d\n", hdr.type, hdr.len);
         // Handle command types
-        switch (type) {
+        switch (hdr.type) {
             case CMD_IDLE: {
                 // do nothing
                 break;
@@ -133,13 +136,13 @@ static void receiver_loop() {
                 Position pos;
                 pos.x = net_to_float((uint32_t) payload.data());
                 pos.y = net_to_float((uint32_t) payload.data() + 4);
-                pos.z = net_to_float((uint32_t)payload.data() + 8);
+                pos.z = net_to_float((uint32_t) payload.data() + 8);
                 printf("[receiver_loop] CMD_PRINT_STATUS received from server\n");
                 printf("Position is x: %f, y: %f, z: %f\n", pos.x, pos.y, pos.z);
                 break;
             }
             default: {
-                printf("[receiver_loop] Unknown message type %d\n", type);
+                printf("[receiver_loop] Unknown message type %d\n", hdr.type);
                 break;
             }
         }
@@ -227,35 +230,14 @@ int SendPosition(SOCKET* ClientSocket, const Position& pos) {
     return 1;
 }
 
-/*
-MsgHeader ReceiveCommand(SOCKET* ClientSocket, FalconCommand* cmd_handler) {
-    MsgHeader hdr;
-    const int hdrsize = sizeof(MsgHeader); // We need another name to not confuse it with hdr.len. hdrlen != hdr.len
-    //char net_buf[hdrsize + 12];
-    std::vector<char> net_buf(hdrsize + 12);
-
-    int r = recv_all(*ClientSocket, net_buf.data(), hdrsize);
-    if (r > 0) {
-        std::memcpy(&hdr, net_buf.data(), hdrsize);
-        hdr.type = ntohs(hdr.type);
-        hdr.len = ntohs(hdr.len);
-        printf("[ReceiveCommand] I received this bytes, header and length: %d, %d and %d.\n", r, hdr.type, hdr.len);
-
-        if (hdr.len > 0) {
-            Position pos_data = { 10.0, 12.0, 14.0 };
-            std::memcpy(&pos_data, net_buf.data() + hdrsize, hdr.len);
-            pos_data.x = net_to_float(pos_data.x);
-            pos_data.y = net_to_float(pos_data.y);
-            pos_data.z = net_to_float(pos_data.z);
-
-            printf("[ReceiveCommand] Position is x: %f, y: %f, and z: %f\n", pos_data.x, pos_data.y, pos_data.z);
-        }
+MsgHeader GetCommand(SOCKET* ClientSocket) {
+    // Pop command from incoming queue
+    MsgHeader hdr = { CMD_ERROR, 0 };
+    if (incoming_cmd_hdr_q.empty()) { 
+        return hdr;
     }
-    else {
-        printf("[recv_command] Nothing has been received.\n");
-    }
-    return hdr;
-}*/
+    return incoming_cmd_hdr_q.pop();
+}
     
 // For removal
 int SendInfo(SOCKET* ClientSocket, char* sendbuf, int sendlen) {

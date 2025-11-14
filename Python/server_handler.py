@@ -1,5 +1,6 @@
 import asyncio
 import struct
+import queue
 from enum import IntEnum
 
 # --- Constants ---
@@ -10,50 +11,102 @@ class FalconCommand(IntEnum):
     CMD_IDLE         = 0x0000,
     CMD_PRINT_STATUS = 0x0001,
 
-# --- Network Communication Handler ---
-async def handle_client(reader, writer, data_queue) -> None:
-    """Comments..."""
-    peername = writer.get_extra_info('peername')
-    print(f"Connected by {peername}")
+# --- Write loop --- 
+async def write_loop(writer, command_queue) -> None:
+    """
+    Awaits commands from the command_queue and sends them to the client.
+    """
+    print("Starting write loop...")
+    while True:
+        try:
+            # get_nowait() is non-blocking.
+            command = command_queue.get_nowait()
+
+            # We have a command. Pack and send it.
+            cmd_type = command['type']
+            payload = command['payload']
+
+            print(f"Sending command {cmd_type} with payload {payload}")
+
+            packed_payload = struct.pack('!fffff', *payload)
+            # Pack the payload (3 floats as an example)
+            #packed_payload = struct.pack(
+            #    '!fff',
+            #    payload[0],
+            #    payload[1],
+            #    payload[2]
+            #)
+            packed_header = struct.pack('!hh', cmd_type, len(packed_payload))
+
+            writer.write(packed_header + packed_payload)
+            await writer.drain()
+        except queue.Empty:
+            # No command in queue, sleep for a bit to yield control
+            # This prevents this loop from consumin 100% CPU
+            await asyncio.sleep(0.02) # Check ~50 times per second
+        except (ConnectionResetError, BrokenPipeError):
+            print("Write loop: Client disconnected")
+            break
+
+# --- Read loop ---
+async def read_loop(reader, data_queue) -> None:
+    """
+    Reads data from the client and puts it into the data_queue.
+    """
+    print("Starting read loop...")
     while True:
         try:
             # Read the 4-byte header (type and length)
             header_data = await reader.readexactly(4)
-            msg_type, msg_length = struct.unpack('!hh', header_data)
-            
-            # Read the payload based on the length of the header
-            payload = await reader.readexactly(msg_length)
+            msg_type, msg_len = struct.unpack('!hh', header_data)
 
-            if msg_type == FalconCommand.CMD_PRINT_STATUS.value:
-                # Unpack the payload as three floats (x, y, z)
+            # Read the payload
+            payload = await reader.readexactly(msg_len)
+
+            if msg_type == 1: # MSG_POSITION
                 x, y, z = struct.unpack('!fff', payload)
                 # Scale the values from m to cm
                 x *= 100.0
                 y *= 100.0
                 z *= 100.0
-                print(f"Received position from {peername}: ({x:.2f}, {y:.2f}, {z:.2f})")
-
-                # Put the received data into the thread-safe queue for the GUI
+                #print(f"Received position: ({x:.2f}, {y:.2f}, {z:.2f})")
                 data_queue.put((x, y, z))
+
         except (asyncio.IncompleteReadError, ConnectionResetError):
-            print(f"Client {peername} disconnected.")
+            print("Read loop: Client disconnected")
             break
-        except Exception as e:
-            print(f"An error ocurred with the client {peername}: {e}")
-            break
+
+# --- Network Communication Handler ---
+async def handle_client(reader, writer, data_queue, command_queue) -> None:
+    """
+    Manages a single client connection by running read and write loops concurrently.
+    """
+    peername = writer.get_extra_info('peername')
+    print(f"Connected by {peername}")
+
+    # Create two concurrent tasks
+    read_task = asyncio.create_task(read_loop(reader, data_queue))
+    write_task = asyncio.create_task(write_loop(writer, command_queue))
+
+    # Wait for either task to complete (which signal disconnects)
+    await asyncio.gather(read_task, write_task)
+
+    print(f"Client {peername} connection closed.")
+    writer.close()
+
 
 # --- Server Starter ---
-async def start_server(data_queue) -> None:
+async def start_server(data_queue, command_queue) -> None:
     """
     Starts the TCP server and configures it to use the handle_client coroutine.
     """
     # The lambda function ensures that our data_queue is passed to each
     # new instance of the handle_client coroutine.
     server = await asyncio.start_server(
-        lambda r, w: handle_client(r, w, data_queue),
+        lambda r, w: handle_client(r, w, data_queue, command_queue),
         HOST, PORT)
     
-    print(f"Server started on {HOST}:{PORT}")
+    print(f"Server has started and is listening on {HOST}:{PORT}")
 
     async with server:
         await server.serve_forever()

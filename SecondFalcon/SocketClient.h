@@ -92,7 +92,7 @@ int send_message(SOCKET s, uint16_t msg_type, const void* payload, uint16_t payl
 /* Main functions */
 int OpenClientConnection(SOCKET* ClientSocket);
 int SendPosition(SOCKET* ClientSocket, const Position& pos);
-//MsgHeader ReceiveCommand(SOCKET* ClientSocket, FalconCommand* cmd_handler);
+MsgHeader GetCommand(SOCKET* SocketClient);
 int SendInfo(SOCKET* ClientSocket, char* sendbuf, int sendlen);
 int CloseClientConnection(SOCKET* ClientSocket);
 

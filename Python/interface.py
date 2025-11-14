@@ -4,7 +4,26 @@ import threading
 import queue
 from server_handler import start_server
 from widgets.pos_widget import update_pos_display
-from tabs.kinematics_tab import create_kinematics_tab
+from tabs.kinematics_tab import create_kinematics_tab, command_queue
+
+# 1. Create the thread-safe queue that will be shared between the server and GUI
+# The server thread will 'put' data into it, and the GUI thread will 'get' data from it.
+# Create a separate queue to send commands from the GUI to the server
+data_queue = queue.Queue()
+#command_queue = queue.Queue()
+
+def send_test_command():
+    """
+    Callback funtion for our new test button.
+    """
+    print("Queueing command for client...")
+    # We can send any data structure. A dictionary is a good choice.
+    # Let's use 1 for "CMD_PRINT_STATUS" and a dummy payload.
+    command_to_send = {
+        "type": 1, # Corresponds to CMD_PRINT_STATUS
+        "payload": [1.0, 2.0, 3.0] # Dummy payload for now
+    }
+    command_queue.put(command_to_send)
 
 # --- GUI Setup ---
 dpg.create_context()
@@ -19,14 +38,13 @@ with dpg.window(label="erishito puede sher", tag="primary_window", width=800, he
         create_kinematics_tab(parent_tab_bar="main_tab_bar")
 
         # Placeholder tab
-        with dpg.tab(label="Placeholder tab"):
+        with dpg.tab(label="Settings"):
             dpg.add_text("This is the Settings tab")
+            dpg.add_button(label="Send test command to Falcon", callback=send_test_command)
+
+
 
 # --- Server and threading setup ---
-
-# 1. Create the thread-safe queue that will be shared between the server and GUI
-# The server thread will 'put' data into it, and the GUI thread will 'get' data from it.
-data_queue = queue.Queue()
 
 def run_server_in_thread() -> None:
     """
@@ -35,7 +53,7 @@ def run_server_in_thread() -> None:
     """
     print("Starting server thread...")
     try:
-        asyncio.run(start_server(data_queue))
+        asyncio.run(start_server(data_queue, command_queue))
     except Exception as e:
         print(f"Error in server thread: {e}")
 
@@ -60,7 +78,6 @@ while dpg.is_dearpygui_running():
         # 'get_nowait()' is non-blocking. It gets an item if one is inmediately
         # available, otherwise, it raises a queue.Empty exception
         x, y, z = data_queue.get_nowait()
-
         # If we successfully got data, update the display
         # This is the ONLY place you should call GUI update functions.
         update_pos_display(x, y, z)
