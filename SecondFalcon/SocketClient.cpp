@@ -104,7 +104,6 @@ static void receiver_loop() {
         std::vector<char> hdr_buf(hdrsize);
 
         int r = recv_all(g_ClientSocket, hdr_buf.data(), hdrsize);
-        //int r = recv_all(g_ClientSocket, reinterpret_cast<char*>(&hdr), sizeof(hdr));
 
         // Check for errors or closed connection
         if (r <= 0) {
@@ -117,6 +116,8 @@ static void receiver_loop() {
         std::memcpy(&hdr, hdr_buf.data(), hdrsize);
         hdr.type = net_to_short(hdr.type);
         hdr.len = net_to_short(hdr.len);
+
+        printf("[receiver_loop] The header is %d and len is %d.\n", hdr.type, hdr.len);
         
         if (hdr.len > 0) {
             std::vector<char> payload_buf(hdr.len);
@@ -138,47 +139,6 @@ static void receiver_loop() {
             incoming_cmd_hdr_q.push(hdr);
 
         }
-
-        //hdr.type = net_to_short(hdr.type);
-        //hdr.len = net_to_short(hdr.len);
-
-        //incoming_cmd_hdr_q.push(hdr);
-
-        /*std::vector<char> payload;
-        if (hdr.len > 0) {
-            payload.resize(hdr.len);
-            r = recv_all(g_ClientSocket, payload.data(), hdr.len);
-            if (r <= 0) {
-                printf("[receiver_loop] payload recv returned %d (error: %d)\n", r, WSAGetLastError());
-                should_threads_run.store(false);
-                break;
-            }
-        }
-
-        printf("[receiver_loop] Received message type %d, length %d\n", hdr.type, hdr.len);
-        */
-
-        // Handle command types
-        /*switch (hdr.type) {
-            case CMD_IDLE: {
-                // do nothing
-                break;
-                }
-
-            case CMD_PRINT_STATUS: {
-                Position pos;
-                pos.x = net_to_float((uint32_t) payload.data());
-                pos.y = net_to_float((uint32_t) payload.data() + 4);
-                pos.z = net_to_float((uint32_t) payload.data() + 8);
-                printf("[receiver_loop] CMD_PRINT_STATUS received from server\n");
-                printf("Position is x: %f, y: %f, z: %f\n", pos.x, pos.y, pos.z);
-                break;
-            }
-            default: {
-                printf("[receiver_loop] Unknown message type %d\n", hdr.type);
-                break;
-            }
-        }*/
     }
 }
 
@@ -267,6 +227,7 @@ MsgHeader GetCommand(SOCKET* ClientSocket) {
     // Pop command from incoming queue
     MsgHeader hdr = { CMD_ERROR, 0 };
     if (incoming_cmd_hdr_q.empty()) { 
+        printf("[GetCommand] Not empty!\n");
         return hdr;
     }
     return incoming_cmd_hdr_q.pop();
@@ -292,13 +253,13 @@ void StopNetworkingThreads() {
     }
 
     if (sender_thread.joinable()) {
-        printf("Joining sender thread... ");
+        printf("[StopNetworkingThreads] Joining sender thread... ");
         sender_thread.join();
         printf("Sender thread joined.\n");
     }
 
     if (receiver_thread.joinable()) {
-        printf("Joining receiver thread... ");
+        printf("[StopNetworkingThreads] Joining receiver thread... ");
         receiver_thread.join();
         printf("Receiver thread joined.\n");
     }

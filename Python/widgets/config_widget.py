@@ -1,7 +1,7 @@
 import dearpygui.dearpygui as dpg
 import queue
 
-def send_dummy_command(command_queue: queue.Queue) -> None:
+def send_dummy_command(command_queue) -> None:
     """
     Callback function for the dummy command button.
     """

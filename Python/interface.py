@@ -4,13 +4,13 @@ import threading
 import queue
 from server_handler import start_server
 from widgets.pos_widget import update_pos_display
-from tabs.kinematics_tab import create_kinematics_tab, command_queue
+from tabs.kinematics_tab import create_kinematics_tab#, command_queue
 
 # 1. Create the thread-safe queue that will be shared between the server and GUI
 # The server thread will 'put' data into it, and the GUI thread will 'get' data from it.
 # Create a separate queue to send commands from the GUI to the server
 data_queue = queue.Queue()
-#command_queue = queue.Queue()
+command_queue = queue.Queue()
 
 def send_test_command():
     """
@@ -35,7 +35,7 @@ with dpg.window(label="erishito puede sher", tag="primary_window", width=800, he
     with dpg.tab_bar(tag="main_tab_bar"):
         # Call the function from your tab file to create the Kinematics tab
         # and all its contents
-        create_kinematics_tab(parent_tab_bar="main_tab_bar")
+        create_kinematics_tab(parent_tab_bar="main_tab_bar", command_queue=command_queue)
 
         # Placeholder tab
         with dpg.tab(label="Settings"):

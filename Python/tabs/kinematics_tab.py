@@ -4,9 +4,9 @@ import queue
 from widgets.pos_widget import create_position_widget
 from widgets.config_widget import create_config_widget
 
-command_queue = queue.Queue()
+#command_queue = queue.Queue()
 
-def create_kinematics_tab(parent_tab_bar) -> None:
+def create_kinematics_tab(parent_tab_bar, command_queue) -> None:
     """Create the kinematics tab in the GUI."""
 
     #with dpg.tab_bar(tag="tab_bar"):
