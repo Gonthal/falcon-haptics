@@ -1,6 +1,7 @@
 import asyncio
 import struct
 import queue
+import socket
 from enum import IntEnum
 
 # --- Constants ---
@@ -85,6 +86,11 @@ async def handle_client(reader, writer, data_queue, command_queue) -> None:
     """
     peername = writer.get_extra_info('peername')
     print(f"Connected by {peername}")
+
+    # Disable Nagle's algorithm (TCP_NODELAY)
+    sock = writer.get_extra_info('socket')
+    if sock is not None:
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
     # Create two concurrent tasks
     read_task = asyncio.create_task(read_loop(reader, data_queue))

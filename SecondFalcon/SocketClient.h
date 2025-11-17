@@ -41,6 +41,7 @@ inline uint16_t net_to_short(uint16_t v) { return ntohs(v); }
 /******************************************************************/
 /* THREAD-SAFE QUEUE DECLARATION & DEFINITION */
 /******************************************************************/
+
 /* Template must be defined in the header so all translation units
    can instantiate it. */
 template <typename T>
@@ -54,7 +55,14 @@ public:
 	// Blocking pop: waits until an element is available
 	T pop() {
 		std::unique_lock<std::mutex> lock(mutex_);
-		cond_.wait(lock, [this] { return !queue_.empty(); });
+		// Wait until queue is not empty OR threads are told to stop
+		cond_.wait(lock, [this] { return !queue_.empty() || !should_threads_run; });
+
+		// If we woke up because of a shutdown, return a default object
+		if (!should_threads_run) {
+			return T(); // T() returns 0 for integers, 0.0 for floats, etc.
+		}
+
 		T value = std::move(queue_.front());
 		queue_.pop();
 		return value;
@@ -72,6 +80,12 @@ public:
 	bool empty() const {
 		std::lock_guard<std::mutex> lock(mutex_);
 		return queue_.empty();
+	}
+
+	// To wake up waiting threads on shutdown
+	void unblock_all() {
+		std::lock_guard<std::mutex> lock(mutex_);
+		cond_.notify_all(); // Wake up ALL waiting threads
 	}
 
 private:

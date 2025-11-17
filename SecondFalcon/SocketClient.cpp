@@ -77,7 +77,7 @@ static void sender_loop() {
         // Blocking wait for a position to send
         Position pos = sending_pos_q.pop();
 
-        // If threads are stopping, exit (we still popped a wakeup item)
+        // If threads are stopping, exit 
         if (!should_threads_run) break;
 
         // This is to send position 
@@ -90,7 +90,7 @@ static void sender_loop() {
         if (res == SOCKET_ERROR) {
             printf("[sender_loop] send_message failed: %d\n", WSAGetLastError());
             // Stop on error; receiver will notice socket shutdown
-            should_threads_run.store(false);
+            should_threads_run = false;
             break;
         }
     }
@@ -100,20 +100,51 @@ static void sender_loop() {
 static void receiver_loop() {
     while (should_threads_run) {
         MsgHeader hdr;
-        int r = recv_all(g_ClientSocket, reinterpret_cast<char*>(&hdr), sizeof(hdr));
+        const int hdrsize = sizeof(MsgHeader);
+        std::vector<char> hdr_buf(hdrsize);
+
+        int r = recv_all(g_ClientSocket, hdr_buf.data(), hdrsize);
+        //int r = recv_all(g_ClientSocket, reinterpret_cast<char*>(&hdr), sizeof(hdr));
+
+        // Check for errors or closed connection
         if (r <= 0) {
             // connection closed or error
             printf("[receiver_loop] header recv returned %d (error: %d)\n", r, WSAGetLastError());
-            should_threads_run.store(false);
-            break;
+            should_threads_run = false; // Tell the sender thread to stop
+            break; // Exit the loop
         }
 
+        std::memcpy(&hdr, hdr_buf.data(), hdrsize);
         hdr.type = net_to_short(hdr.type);
         hdr.len = net_to_short(hdr.len);
+        
+        if (hdr.len > 0) {
+            std::vector<char> payload_buf(hdr.len);
+            
+            // Check for disconnection on payload as well
+            int r_payload = recv_all(g_ClientSocket, payload_buf.data(), hdr.len);
+            if (r_payload <= 0) {
+                printf("[receiver_loop] payload recv returned %d (error: %d)\n", r_payload, WSAGetLastError());
+                should_threads_run = false;
+                break;
+            }
 
-        incoming_cmd_hdr_q.push(hdr);
+            Position pos_data;
+            std::memcpy(&pos_data, payload_buf.data(), hdr.len);
+            pos_data.x = net_to_float((uint32_t)payload_buf.data());
+            pos_data.y = net_to_float((uint32_t)payload_buf.data() + 4);
+            pos_data.z = net_to_float((uint32_t)payload_buf.data() + 8);
 
-        std::vector<char> payload;
+            incoming_cmd_hdr_q.push(hdr);
+
+        }
+
+        //hdr.type = net_to_short(hdr.type);
+        //hdr.len = net_to_short(hdr.len);
+
+        //incoming_cmd_hdr_q.push(hdr);
+
+        /*std::vector<char> payload;
         if (hdr.len > 0) {
             payload.resize(hdr.len);
             r = recv_all(g_ClientSocket, payload.data(), hdr.len);
@@ -125,6 +156,8 @@ static void receiver_loop() {
         }
 
         printf("[receiver_loop] Received message type %d, length %d\n", hdr.type, hdr.len);
+        */
+
         // Handle command types
         /*switch (hdr.type) {
             case CMD_IDLE: {
@@ -239,34 +272,49 @@ MsgHeader GetCommand(SOCKET* ClientSocket) {
     return incoming_cmd_hdr_q.pop();
 }
 
+void StopNetworkingThreads() {
+    if (!should_threads_run) return;
+
+    printf("[StopNetworkingThreads] Stopping networking threads...\n");
+    should_threads_run = false;
+
+    // Unblock threads waiting on pop()
+    sending_pos_q.unblock_all();
+    incoming_pos_q.unblock_all();
+    incoming_cmd_hdr_q.unblock_all();
+
+    // Shutdown and close the socket
+    // This will interrupt the blocking 'recv_all' in the receiver thread
+    if (g_ClientSocket != INVALID_SOCKET) {
+        shutdown(g_ClientSocket, SD_BOTH);
+        closesocket(g_ClientSocket);
+        g_ClientSocket = INVALID_SOCKET;
+    }
+
+    if (sender_thread.joinable()) {
+        printf("Joining sender thread... ");
+        sender_thread.join();
+        printf("Sender thread joined.\n");
+    }
+
+    if (receiver_thread.joinable()) {
+        printf("Joining receiver thread... ");
+        receiver_thread.join();
+        printf("Receiver thread joined.\n");
+    }
+}
+
 /*
 *  This function takes care of closing the socket
 */
 int CloseClientConnection(SOCKET* ClientSocket) {
     // request threads to stop
-    should_threads_run.store(false);
+    StopNetworkingThreads();
 
-    // Shutdown the connection since no more data will be sent
-    iResult = shutdown(*ClientSocket, SD_SEND);
-    if (iResult == SOCKET_ERROR) {
-        printf("shutdown failed with error: %d\n", WSAGetLastError());
-        closesocket(*ClientSocket);
-        WSACleanup();
-        return 1;
-    }
-
-    // wake sender by pushing a dummy position (unblocks pop)
-    sending_pos_q.push(Position{ 0.0f, 0.0f, 0.0f });
-
-    // join threads
-    if (sender_thread.joinable()) sender_thread.join();
-    if (receiver_thread.joinable()) receiver_thread.join();
-
-    // Cleanup
-    closesocket(*ClientSocket);
+    // Socket is already closed, just clean up WSA
     WSACleanup();
+    *ClientSocket = INVALID_SOCKET;
 
-    printf("Client finished. Press ENTER to exit...\n");
-    getchar();
+    printf("Client connection closed.\n");
     return 0;
 }
