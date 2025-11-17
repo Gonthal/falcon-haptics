@@ -126,7 +126,7 @@ static void receiver_loop() {
 
         printf("[receiver_loop] Received message type %d, length %d\n", hdr.type, hdr.len);
         // Handle command types
-        switch (hdr.type) {
+        /*switch (hdr.type) {
             case CMD_IDLE: {
                 // do nothing
                 break;
@@ -145,7 +145,7 @@ static void receiver_loop() {
                 printf("[receiver_loop] Unknown message type %d\n", hdr.type);
                 break;
             }
-        }
+        }*/
     }
 }
 
@@ -237,49 +237,6 @@ MsgHeader GetCommand(SOCKET* ClientSocket) {
         return hdr;
     }
     return incoming_cmd_hdr_q.pop();
-}
-    
-// For removal
-int SendInfo(SOCKET* ClientSocket, char* sendbuf, int sendlen) {
-        
-    if (!sendbuf) {
-        printf("Invalid send buffer.\n");
-        return 1;
-    }
-
-    if (sendlen == 0) {
-        // nothing to send 
-        printf("No data to send. \n");
-        return 0;
-    }
-
-    //iResult = send_sentence(*ClientSocket, sendbuf, sendlen);
-    iResult = send_all(*ClientSocket, sendbuf, sendlen);
-    if (iResult == SOCKET_ERROR) {
-        printf("Send failed with error: %d\n", WSAGetLastError());
-        closesocket(*ClientSocket);
-        WSACleanup();
-        return 1;
-    }
-    printf("Sent %d bytes: \"%s\"\n", iResult, sendbuf);
-
-    iResult = recv(*ClientSocket, recvbuf, recvbuflen, 0);
-    if (iResult > 0) {
-        printf("Bytes received: %d -- \"", iResult);
-        fwrite(recvbuf, 1, iResult, stdout);
-        printf("\"\n");
-    }
-    else if (iResult == 0) {
-        printf("Connection closed by server.\n");
-    }
-    else {
-        printf("recv failed with error: %d\n", WSAGetLastError());
-        closesocket(*ClientSocket);
-        WSACleanup();
-        return 1;
-    }
-
-    return 0;
 }
 
 /*
