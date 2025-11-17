@@ -93,7 +93,6 @@ int send_message(SOCKET s, uint16_t msg_type, const void* payload, uint16_t payl
 int OpenClientConnection(SOCKET* ClientSocket);
 int SendPosition(SOCKET* ClientSocket, const Position& pos);
 MsgHeader GetCommand(SOCKET* SocketClient);
-int SendInfo(SOCKET* ClientSocket, char* sendbuf, int sendlen);
 int CloseClientConnection(SOCKET* ClientSocket);
 
 /* Asynchronous API */

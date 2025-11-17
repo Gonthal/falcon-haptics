@@ -73,7 +73,7 @@ SQRESULT SQ_getCommand(HSQUIRRELVM v) {
 	MsgHeader incoming_cmd = GetCommand(&FalconClientSocket);
 
 	sq_pushinteger(v, incoming_cmd.type);
-	sq_pushinteger(v, incoming_cmd.len);
+	//sq_pushinteger(v, incoming_cmd.len);
 	return SQ_OK;
 }
 SQ_BIND_GLOBAL_METHOD(getCommand);

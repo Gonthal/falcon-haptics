@@ -108,8 +108,8 @@ static void receiver_loop() {
             break;
         }
 
-        hdr.type = (FalconCommand) ntohs(hdr.type);
-        hdr.len = ntohs(hdr.len);
+        hdr.type = net_to_short(hdr.type);
+        hdr.len = net_to_short(hdr.len);
 
         incoming_cmd_hdr_q.push(hdr);
 

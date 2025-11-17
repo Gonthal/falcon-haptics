@@ -126,12 +126,15 @@ function HapticsThink (deviceHandle)
 	}
 
 	if (devicewasbuttonjustpressed(deviceHandle, FALCON_TRIANGLE)) {
-		local header, len = getCommand();
-		if (header == 100) {
+		local header = getCommand();
+
+		print("Received header: " + header + "\n");
+
+		/*if (header == 100) {
 			print("Nothing has been received...\n");
 		} else {
 			print("Received command and length: " + header + " : " + len + "\n");
-		}
+		}*/
 		print("Triangle\n");
 	}
 

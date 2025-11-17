@@ -8,7 +8,7 @@ def send_dummy_command(command_queue: queue.Queue) -> None:
     print("Queueing dummy command for client...");
     command_to_send = {
         "type": 7,
-        "payload": [1.0, 2.0, 3.0, 4.0, 5.0] # Dummy payload
+        "payload": [5.0, 4.0, 3.0] # Dummy payload
     }
     command_queue.put(command_to_send)
 

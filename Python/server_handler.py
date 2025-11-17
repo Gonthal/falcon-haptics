@@ -26,10 +26,11 @@ async def write_loop(writer, command_queue) -> None:
             cmd_type = command['type']
             payload = command['payload']
 
-            print(f"Sending command {cmd_type} with payload {payload}")
+            print(f"[write_loop] Sending command {cmd_type} with payload {payload}")
 
-            packed_payload = struct.pack('!fffff', *payload)
+            #packed_payload = struct.pack('!fffff', *payload)
             # Pack the payload (3 floats as an example)
+            packed_payload = struct.pack('!fff', *payload)
             #packed_payload = struct.pack(
             #    '!fff',
             #    payload[0],
@@ -38,7 +39,8 @@ async def write_loop(writer, command_queue) -> None:
             #)
             packed_header = struct.pack('!hh', cmd_type, len(packed_payload))
 
-            writer.write(packed_header + packed_payload)
+            #writer.write(packed_header + packed_payload)
+            writer.write(packed_header)
             await writer.drain()
         except queue.Empty:
             # No command in queue, sleep for a bit to yield control
