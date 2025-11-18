@@ -11,6 +11,9 @@ SOCKET FalconClientSocket = INVALID_SOCKET;
 static const char* init_message = "Hello, Falcon!";
 FILE* pDebugLogFile = NULL;
 
+// Is a Falcon handler really necessary?
+FalconHandler falcon_instance;
+
 Position current_position = { 0.0, 0.0, 0.0 };
 
 SQRESULT SQ_debugLog_open(HSQUIRRELVM v) {
@@ -48,15 +51,6 @@ SQRESULT SQ_createSocketConnection(HSQUIRRELVM v) {
 	return SQ_OK;
 }
 SQ_BIND_GLOBAL_METHOD(createSocketConnection);
-
-// For removal
-SQRESULT SQ_sendSocketInfo(HSQUIRRELVM v, const SQChar *sendbuf, SQInteger sendlen) {
-
-	printf("Sending info to Falcon...\n");
-
-	return SQ_OK;
-}
-SQ_BIND_GLOBAL_METHOD(sendSocketInfo);
 
 SQRESULT SQ_sendPosition(HSQUIRRELVM v, SQFloat posx, SQFloat posy, SQFloat posz) {
 	current_position.x = (float)posx;

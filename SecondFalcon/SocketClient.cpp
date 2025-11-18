@@ -130,14 +130,13 @@ static void receiver_loop() {
                 break;
             }
 
-            Position pos_data;
-            std::memcpy(&pos_data, payload_buf.data(), hdr.len);
-            pos_data.x = net_to_float((uint32_t)payload_buf.data());
-            pos_data.y = net_to_float((uint32_t)payload_buf.data() + 4);
-            pos_data.z = net_to_float((uint32_t)payload_buf.data() + 8);
-
             incoming_cmd_hdr_q.push(hdr);
 
+            //Position pos_data;
+            //std::memcpy(&pos_data, payload_buf.data(), hdr.len);
+            //pos_data.x = net_to_float((uint32_t)payload_buf.data());
+            //pos_data.y = net_to_float((uint32_t)payload_buf.data() + 4);
+            //pos_data.z = net_to_float((uint32_t)payload_buf.data() + 8);
         }
     }
 }

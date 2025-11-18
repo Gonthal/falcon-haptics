@@ -12,7 +12,6 @@ SQ_GLOBAL_METHOD(debugLog_open, 0);
 SQ_GLOBAL_METHOD(debugLog_close, 0);
 SQ_GLOBAL_METHOD(debugLog_print, 1, const SQChar *);
 SQ_GLOBAL_METHOD(createSocketConnection, 0);
-SQ_GLOBAL_METHOD(sendSocketInfo, 2, const SQChar *, SQInteger);
 SQ_GLOBAL_METHOD(sendPosition, 3, SQFloat, SQFloat, SQFloat);
 SQ_GLOBAL_METHOD(getCommand, 0);
 SQ_GLOBAL_METHOD(closeSocketConnection, 0);

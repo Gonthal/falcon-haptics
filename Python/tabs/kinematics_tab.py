@@ -19,7 +19,7 @@ def create_kinematics_tab(parent_tab_bar, command_queue) -> None:
                 dpg.add_text("Kinematics")
                 create_position_widget(parent_window="kinematics_position_child")
                 
-            with dpg.child_window(width=200, height=300, tag="kinematics_config_child"):
+            with dpg.child_window(width=-1, height=300, tag="kinematics_config_child"):
                 dpg.add_text("Falcon configuration")
                 create_config_widget(parent_window="kinematics_config_child", command_queue=command_queue)
                 dpg.add_separator()

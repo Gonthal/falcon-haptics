@@ -15,7 +15,19 @@ def send_dummy_command(sender, app_data, user_data: queue.Queue) -> None:
 
 def create_config_widget(parent_window, command_queue) -> None:
     """Creates the DearPyGUI widget for configuration settings."""
-    with dpg.child_window(parent=parent_window, width=-1, height=105):
-        dpg.add_text("Falcon configuration")
+    dpg.add_checkbox(
+            label="Recoil on button press",
+            tag="recoil_checkbox",
+            default_value=True
+        )
+    
+    dpg.add_slider_int(
+        label="Recoil strength",
+        tag="recoil_str_slider",
+        width=150,
+        min_value=0,
+        max_value=10
+    )
 
-        dpg.add_button(label="Dummy command", width=-1, callback=send_dummy_command, user_data=command_queue)
+    dpg.add_button(label="Dummy command", width=-1, callback=send_dummy_command, user_data=command_queue)
+    #with dpg.child_window(parent=parent_window, width=-1, height=105):

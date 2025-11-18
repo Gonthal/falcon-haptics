@@ -7,6 +7,7 @@
 #include <cstdint> // uint16_t, uint32_t, etc.
 #include <cstring> // std::memcpy, used on SocketClient.cpp
 
+// Is this deprecated?
 typedef enum {
 	SOCKET_WSA_STARTUP_FAILED = 1,
 	SOCKET_GETADDRINFO_FAILED,
@@ -39,26 +40,20 @@ typedef struct _MsgHeader {
 #pragma pack(pop)
 
 #pragma pack(push, 1)
-typedef struct {
+typedef struct _Position {
 	float x, y, z;
 } Position;
 #pragma pack(pop)
 
-/*
-typedef struct {
-	typedef struct position {
-		float x;
-		float y;
-		float z;
-	};
-	position pos;
+#pragma pack(push, 1)
+typedef struct _Torque {
+	float x, y, z;
+} Torque;
+#pragma pack(pop)
 
-	typedef struct torque {
-		float x;
-		float y;
-		float z;
-	};
-	torque tor;
-} FalconHandler;*/
+typedef struct _FalconHandler {
+	Position pos;
+	Torque torque;
+} FalconHandler;
 
 #endif
