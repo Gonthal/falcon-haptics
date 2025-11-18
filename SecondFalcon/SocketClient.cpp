@@ -227,10 +227,12 @@ MsgHeader GetCommand(SOCKET* ClientSocket) {
     // Pop command from incoming queue
     MsgHeader hdr = { CMD_ERROR, 0 };
     if (incoming_cmd_hdr_q.empty()) { 
-        printf("[GetCommand] Not empty!\n");
+        printf("[GetCommand] Empty!\n");
         return hdr;
     }
-    return incoming_cmd_hdr_q.pop();
+    hdr = incoming_cmd_hdr_q.pop();
+    printf("[GetCommand] Header and length: %d & %d.\n", hdr.type, hdr.len);
+    return hdr;
 }
 
 void StopNetworkingThreads() {

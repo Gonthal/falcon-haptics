@@ -148,7 +148,7 @@ function HapticsThink (deviceHandle)
 		print("Plus\n")
 	}
 
-	// - Get the next frame ready -
+	// --- Get the next frame ready ---
 	gScriptTime.update();
 	gLastTime = gScriptTime.elapsedseconds();
 }

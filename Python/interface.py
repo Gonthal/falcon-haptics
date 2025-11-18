@@ -4,7 +4,7 @@ import threading
 import queue
 from server_handler import start_server
 from widgets.pos_widget import update_pos_display
-from tabs.kinematics_tab import create_kinematics_tab#, command_queue
+from tabs.kinematics_tab import create_kinematics_tab
 
 # 1. Create the thread-safe queue that will be shared between the server and GUI
 # The server thread will 'put' data into it, and the GUI thread will 'get' data from it.

@@ -9,8 +9,8 @@ HOST = '127.0.0.1' # Standard loopback interface address (localhost)
 PORT = 27015
 
 class FalconCommand(IntEnum):
-    CMD_IDLE         = 0x0000,
-    CMD_PRINT_STATUS = 0x0001,
+    CMD_IDLE         = 0x0000
+    CMD_PRINT_STATUS = 0x0001
 
 # --- Write loop --- 
 async def write_loop(writer, command_queue) -> None:
@@ -29,19 +29,14 @@ async def write_loop(writer, command_queue) -> None:
 
             print(f"[write_loop] Sending command {cmd_type} with payload {payload}")
 
-            #packed_payload = struct.pack('!fffff', *payload)
-            # Pack the payload (3 floats as an example)
-            packed_payload = struct.pack('!fff', *payload)
-            #packed_payload = struct.pack(
-            #    '!fff',
-            #    payload[0],
-            #    payload[1],
-            #    payload[2]
-            #)
+            # Pack payload generically as N floats (for now)
+            fmt = '!' + ('f' * len(payload))
+            packed_payload = struct.pack(fmt, *payload)
+
             packed_header = struct.pack('!hh', cmd_type, len(packed_payload))
 
-            #writer.write(packed_header + packed_payload)
-            writer.write(packed_header)
+            # Send header + payload together and drain once
+            writer.write(packed_header + packed_payload)
             await writer.drain()
         except queue.Empty:
             # No command in queue, sleep for a bit to yield control
@@ -101,6 +96,10 @@ async def handle_client(reader, writer, data_queue, command_queue) -> None:
 
     print(f"Client {peername} connection closed.")
     writer.close()
+    try:
+        await writer.wait_closed()
+    except Exception:
+        pass
 
 
 # --- Server Starter ---
