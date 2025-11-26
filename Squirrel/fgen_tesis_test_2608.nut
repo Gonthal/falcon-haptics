@@ -207,7 +207,7 @@ function executeEffect (deltaTime) {
 			break;
 		}
 
-		case gEffectTypeTable.spring {
+		case gEffectTypeTable.spring: {
 			break;
 		}
 
@@ -326,7 +326,7 @@ function ConnectOrDisconnectStacks (deviceHandle, bConnect) {
 function HapticsInitialize (registryConfigHandle)
 {
 	print("Initialize Script\n");
-	//createSocketConnection(); // SOCKET INITIALIZATION
+	createSocketConnection(); // SOCKET INITIALIZATION
 	// launch the control box
 	gControlBox = controlbox(effectparameters("_DefaultControlBox", gControlBoxStack), gControlBoxStack);
 	if (gControlBox != null) {
@@ -470,7 +470,7 @@ function HapticsDeactivated (deviceHandle)
 //-------------------------------------------------------------
 function HapticsShutdown (  )
 {
-	//closeSocketConnection();    // Close the socket
+	closeSocketConnection();    // Close the socket
 	print("Shutdown Script\n");
 }
 
