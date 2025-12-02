@@ -21,6 +21,7 @@ static SOCKET g_ClientSocket = INVALID_SOCKET;
 static ThreadSafeQueue<Position> sending_pos_q;
 static ThreadSafeQueue<Position> incoming_pos_q;
 static ThreadSafeQueue<MsgHeader> incoming_cmd_hdr_q;
+static ThreadSafeQueue<FalconMessage> incoming_msg_q;
 
 /******************************************************************/
 /* UTILITY FUNCTIONS DECLARATIONS                                 */
@@ -54,7 +55,7 @@ int send_message(SOCKET s, uint16_t msg_type, const void* payload, uint16_t payl
     // Convert header type and length to network order
     // Both fields are uint16_t, so we use htons (used for unsigned shorts)
     // See https://learn.microsoft.com/es-es/windows/win32/api/winsock2/nf-winsock2-htons
-    hdr.type = (FalconCommand) htons(msg_type);
+    hdr.type = htons(msg_type);
     hdr.len = htons(payload_len);
 
     // Create a contiguous buffer for header + payload
@@ -119,6 +120,9 @@ static void receiver_loop() {
 
         printf("[receiver_loop] The header is %d and len is %d.\n", hdr.type, hdr.len);
         
+        FalconMessage msg;
+        msg.type = hdr.type;
+
         if (hdr.len > 0) {
             std::vector<char> payload_buf(hdr.len);
             
@@ -130,7 +134,20 @@ static void receiver_loop() {
                 break;
             }
 
-            incoming_cmd_hdr_q.push(hdr);
+            // Convert bytes to floats (this will need REVISION later)
+            int num_floats = hdr.len / sizeof(float);
+            for (int i = 0; i < num_floats; i++) {
+                uint32_t temp;
+                std:memcpy(
+                    &temp,
+                    payload_buf.data() + (i * sizeof(float)),
+                    sizeof(float)
+                );
+                msg.payload.push_back(net_to_float(temp));
+            }
+
+            incoming_msg_q.push(msg);
+            //incoming_cmd_hdr_q.push(hdr);
 
             //Position pos_data;
             //std::memcpy(&pos_data, payload_buf.data(), hdr.len);
@@ -222,16 +239,12 @@ int SendPosition(SOCKET* ClientSocket, const Position& pos) {
     return 1;
 }
 
-MsgHeader GetCommand(SOCKET* ClientSocket) {
-    // Pop command from incoming queue
-    MsgHeader hdr = { CMD_ERROR, 0 };
-    if (incoming_cmd_hdr_q.empty()) { 
-        printf("[GetCommand] Empty!\n");
-        return hdr;
+FalconMessage GetCommand(SOCKET* ClientSocket) {
+    FalconMessage msg = { CMD_ERROR, {} }; // Empty payload
+    if (incoming_msg_q.empty()) {
+        return msg;
     }
-    hdr = incoming_cmd_hdr_q.pop();
-    printf("[GetCommand] Header and length: %d & %d.\n", hdr.type, hdr.len);
-    return hdr;
+    return incoming_msg_q.pop();
 }
 
 void StopNetworkingThreads() {

@@ -6,6 +6,7 @@
 #include "stdafx.h"
 #include <cstdint> // uint16_t, uint32_t, etc.
 #include <cstring> // std::memcpy, used on SocketClient.cpp
+#include <vector>
 
 // Is this deprecated?
 typedef enum {
@@ -26,18 +27,28 @@ enum : uint16_t {
 };
 
 // 
-typedef enum _FalconCommand : uint16_t {
-	CMD_IDLE = 0,
-	CMD_PRINT_STATUS = 1,
-	CMD_ERROR = 100
-} FalconCommand;
+typedef enum _FalconCommandTypes : uint16_t {
+	CMD_NONE      = 0,
+	CMD_ROCK      = 1,
+	CMD_SANDPAPER = 2,
+	CMD_OIL       = 3,
+	CMD_SPRING    = 4,
+	CMD_WATER     = 5,
+	CMD_ERROR     = 100
+} FalconCommandTypes;
 
 #pragma pack(push, 1) // Ensure no padding is added by the compiler
 typedef struct _MsgHeader {
-	uint16_t      type;	  // network order
-	uint16_t      len;    // payload length in bytes, network order
+	uint16_t type;	 // payload length in bytes, network order
+	uint16_t len;    // network order
 } MsgHeader;
 #pragma pack(pop)
+
+// Struct to hold the full command data
+typedef struct _FalconMessage {
+	uint16_t type;
+	std::vector<float> payload;
+} FalconMessage;
 
 #pragma pack(push, 1)
 typedef struct _Position {

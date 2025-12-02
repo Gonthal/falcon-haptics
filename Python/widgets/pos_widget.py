@@ -16,12 +16,10 @@ def create_position_widget(parent_window) -> None:
 
             with dpg.group(horizontal=True):
                 dpg.add_text("Y:")
-                #dpg.add_input_text(tag="pos_y_text", default_value="0.00", width=100, enabled=False)
                 dpg.add_slider_float(tag="pos_y_slider", width=-1, min_value=-6.0, max_value=6.0, enabled=False)
 
             with dpg.group(horizontal=True):
                 dpg.add_text("Z:")
-                #dpg.add_input_text(tag="pos_z_text", default_value="0.00", width=100, enabled=False)
                 dpg.add_slider_float(tag="pos_z_slider", width=-1, min_value=-6.0, max_value=6.0, enabled=False)
 
 def update_pos_display(x: float, y:float, z:float) -> None:

@@ -4,7 +4,8 @@ import threading
 import queue
 from server_handler import start_server
 from widgets.pos_widget import update_pos_display
-from tabs.kinematics_tab import create_kinematics_tab
+from widgets.plots_widget import update_plot_data
+from tabs.sandbox_tab import create_sandbox_tab
 
 # 1. Create the thread-safe queue that will be shared between the server and GUI
 # The server thread will 'put' data into it, and the GUI thread will 'get' data from it.
@@ -29,13 +30,10 @@ def send_test_command():
 dpg.create_context()
 
 with dpg.window(label="erishito puede sher", tag="primary_window", width=800, height=600):
-    #dpg.add_text("Falcon Haptic Device Interface")py --
-    #dpg.add_spacer()
     # Create a tab bar that will hold all the main tabs
     with dpg.tab_bar(tag="main_tab_bar"):
-        # Call the function from your tab file to create the Kinematics tab
-        # and all its contents
-        create_kinematics_tab(parent_tab_bar="main_tab_bar", command_queue=command_queue)
+        # Sandbox tab: kinematics, plots, haptic effects
+        create_sandbox_tab(parent_tab_bar="main_tab_bar", command_queue=command_queue)
 
         # Placeholder tab
         with dpg.tab(label="Settings"):
@@ -66,7 +64,7 @@ server_thread.start()
 print("Server thread started.")
 
 # --- DearPyGUI Main Loop ---
-dpg.create_viewport(title='GUI Control Panel', width=800, height=600)
+dpg.create_viewport(title='GUI Control Panel', width=1000, height=600)
 dpg.setup_dearpygui()
 dpg.show_viewport()
 dpg.set_primary_window("primary_window", True)
@@ -81,6 +79,7 @@ while dpg.is_dearpygui_running():
         # If we successfully got data, update the display
         # This is the ONLY place you should call GUI update functions.
         update_pos_display(x, y, z)
+        update_plot_data(new_x = x)
 
     except queue.Empty:
         # This is the nomal case when no new data has arrived since the last frame

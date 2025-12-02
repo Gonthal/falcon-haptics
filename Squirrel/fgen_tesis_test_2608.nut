@@ -56,15 +56,15 @@ gTimeSinceLastSend <- 0.0;     // time since last data send
 gEffectsStack <- effectstack("effects", 1.0);      // creating default Falcon effect stack
 gEnvelopeEffectID <- registereffect("Envelope");   // registering           // no fall off time at end of effect
 
-// --- BUMPY RECOIL ---
-gBumpyRecoil <- effectparameters(gEnvelopeEffectID, gEffectsStack); // create the effect
-gBumpyRecoil.setvarelement("force", 0, 0);   // 0 newtons right-wards
-gBumpyRecoil.setvarelement("force", 1, 0);   // 0 newtons upwards
-gBumpyRecoil.setvarelement("force", 2, 20);  // 20 newtons backwards
-gBumpyRecoil.setvar("attack", 10);           // ramp up to the force over 30 milliseconds
-gBumpyRecoil.setvar("hold", 0);              // no hold time once at maximum force
-gBumpyRecoil.setvar("decay", 0);             // no fall off time at end of effect
-const BUMPY_THRESHOLD = 0.01;  // 1 cm
+// --- ROCK RECOIL ---
+gRockRecoil <- effectparameters(gEnvelopeEffectID, gEffectsStack); // create the effect
+gRockRecoil.setvarelement("force", 0, 0);   // 0 newtons right-wards
+gRockRecoil.setvarelement("force", 1, 0);   // 0 newtons upwards
+gRockRecoil.setvarelement("force", 2, 20);  // 20 newtons backwards
+gRockRecoil.setvar("attack", 10);           // ramp up to the force over 30 milliseconds
+gRockRecoil.setvar("hold", 0);              // no hold time once at maximum force
+gRockRecoil.setvar("decay", 0);             // no fall off time at end of effect
+const ROCK_THRESHOLD = 0.01;  // 1 cm
 
 // --- SANDPAPER RECOIL ---
 gSandpaperRecoil <- effectparameters(gEnvelopeEffectID, gEffectsStack); // create the effect
@@ -80,7 +80,7 @@ const SANDPAPER_THRESHOLD = 0.001; // 1 mm
 // Used to identify different surface effects
 gEffectTypeTable <- {};
 gEffectTypeTable.noeffect  <- 0;
-gEffectTypeTable.bumpy     <- 1;
+gEffectTypeTable.rock      <- 1;
 gEffectTypeTable.sandpaper <- 2;
 gEffectTypeTable.oil       <- 3;
 gEffectTypeTable.spring    <- 4;
@@ -95,6 +95,8 @@ gControlBoxStack <- effectstack("ControlBox", 1.0);
 gControlBoxEffectID <- registereffect("ControlBox");
 gControlBox <- null; // variable to store the control box in
 
+
+gTestControlBox <- null;
 
 // --- Create the movement effect stack ---
 // Create a separate effects stack for movement forces
@@ -111,33 +113,20 @@ gMovementForce <- null;
 // ------------------------------------------------------------
 // Calculate the distance between two 3D points
 // ------------------------------------------------------------
-function calc_distance (pos1, pos2) {
+function calc_3d_distance (pos1, pos2) {
 	local dx = pos2.x - pos1.x;
 	local dy = pos2.y - pos1.y;
 	local dz = pos2.z - pos1.z;
 	return sqrt(dx*dx + dy*dy + dz*dz);
 }
 
-function getSign(x)
-{
-    if (x > 0) return 1;
-    if (x < 0) return -1;
-    return 0;
+function calc_2d_distance(pos1, pos2) {
+	local dx = pos2.x - pos1.x;
+	local dy = pos2.y - pos1.y;
+	return sqrt(dx*dx + dy*dy);
 }
 
-function get_movement_direction (pos1, pos2) {
-	local direction = {
-		x = 0,
-		y = 0,
-		z = 0
-	};
 
-	direction.x = getSign(pos2.x - pos1.x);
-	direction.y = getSign(pos2.y - pos1.y);
-	direction.z = getSign(pos2.z - pos1.z);
-
-	return direction;
-}
 
 function executeEffect (deltaTime) {
 	switch (gEffectType) {
@@ -145,9 +134,9 @@ function executeEffect (deltaTime) {
 			gMovementForce.setforce(0.0, 0.0, 0.0);
 			break;
 
-		case gEffectTypeTable.bumpy:
-			if (calc_distance(gPosition, gLastPosition) >= BUMPY_THRESHOLD) {
-				gBumpyRecoil.fire();
+		case gEffectTypeTable.rock:
+			if (calc_2d_distance(gPosition, gLastPosition) >= ROCK_THRESHOLD) {
+				gRockRecoil.fire();
 				gLastPosition.x = gPosition.x;
 				gLastPosition.y = gPosition.y;
 				gLastPosition.z = gPosition.z;
@@ -155,7 +144,7 @@ function executeEffect (deltaTime) {
 			break;
 
 		case gEffectTypeTable.sandpaper:
-			if (calc_distance(gPosition, gLastPosition) >= SANDPAPER_THRESHOLD) {
+			if (calc_2d_distance(gPosition, gLastPosition) >= SANDPAPER_THRESHOLD) {
 				gSandpaperRecoil.fire();
 				gLastPosition.x = gPosition.x;
 				gLastPosition.y = gPosition.y;
@@ -317,8 +306,6 @@ function ConnectOrDisconnectStacks (deviceHandle, bConnect) {
 		devicedisconnectstack(deviceHandle, gMovementStack);
 	}
 }
-
-
 //-------------------------------------------------------------
 // Initialize this script
 // Called once when this script is first loaded
@@ -327,6 +314,11 @@ function HapticsInitialize (registryConfigHandle)
 {
 	print("Initialize Script\n");
 	createSocketConnection(); // SOCKET INITIALIZATION
+	// we will need to check out this whole control box thing
+	// or let it flop
+	//gTestControlBox = effectparameters(gControlBoxEffectID, gControlBoxStack);
+	//gTestControlBox.setvar("deadband", 0.4);
+	//gControlBox = controlbox(gTestControlBox, gControlBoxStack);
 	// launch the control box
 	gControlBox = controlbox(effectparameters("_DefaultControlBox", gControlBoxStack), gControlBoxStack);
 	if (gControlBox != null) {
@@ -391,7 +383,7 @@ function HapticsThink (deviceHandle)
 		gTimeSinceLastSend = gTimeSinceLastSend % SEND_INTERVAL;
 	}
 
-	// Execute the current effect: none, bumpy, sandpaper, oil or water
+	// Execute the current effect: none, rock, sandpaper, oil or water
 	executeEffect(deltaTime);
 
 
@@ -408,9 +400,9 @@ function HapticsThink (deviceHandle)
 
 	if (devicewasbuttonjustpressed(deviceHandle, FALCON_LOGO)) {
 		if (gEffectType == gEffectTypeTable.noeffect) {
-			print("Bumpy!\n");
-			gEffectType = gEffectTypeTable.bumpy;
-		} else if (gEffectType == gEffectTypeTable.bumpy) {
+			print("Rock!\n");
+			gEffectType = gEffectTypeTable.rock;
+		} else if (gEffectType == gEffectTypeTable.rock) {
 			print("Sandpaper!\n");
 			gEffectType = gEffectTypeTable.sandpaper;
 		} else if (gEffectType == gEffectTypeTable.sandpaper) {
@@ -427,15 +419,46 @@ function HapticsThink (deviceHandle)
 	}
 
 	if (devicewasbuttonjustpressed(deviceHandle, FALCON_TRIANGLE)) {
-		local header = getCommand();
+		// cmd is a table: { type: ..., data = [...] }
+		local cmd = getCommand();
 
-		print("Received header: " + header + "\n");
+		if (cmd.type != 100) {
+			print("The effect type is " + cmd.type + "\n");
+			gEffectType = cmd.type;
+		} else {
+			print("ERROR: invalidad command type \n");
+		}
+
+		/*if (cmd.type != 0) {
+			print("Received command type: " + cmd.type + "\n");
+
+			// Access payload data array
+			if (cmd.data.len() >= 3) {
+				print("Payload ");
+				foreach (idx, val in cmd.data) {
+					print(val + " ");
+				}
+				print("\n");
+
+				//local val1 = cmd.data[0];
+				//local val2 = cmd.data[1];
+				//local val3 = cmd.data[2];
+				//print("Payload: " + val1 + ", " + val2 + ", " + val3 + "\n");
+			} else {
+				print("Something went wrong with the command. \n");
+			}
+		}*/
 		print("Triangle\n");
 	}
 
 	if (devicewasbuttonjustpressed(deviceHandle, FALCON_LIGHTNING)) {
-		// launch simple recoil effect
-		//gSimpleRecoil.fire();
+		/*gTestControlBox.setvar("deadband", 0.3)
+		gControlBox = controlbox(gTestControlBox, gControlBoxStack);
+		if (gControlBox != null) {
+			setinputeffect(gControlBox);
+		} else {
+			print("Oops, something went wrong with the control box. \n")
+		}*/
 		print("Lightning\n");
 	}
 

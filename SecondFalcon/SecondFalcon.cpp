@@ -64,10 +64,30 @@ SQRESULT SQ_sendPosition(HSQUIRRELVM v, SQFloat posx, SQFloat posy, SQFloat posz
 SQ_BIND_GLOBAL_METHOD(sendPosition);
 
 SQRESULT SQ_getCommand(HSQUIRRELVM v) {
-	MsgHeader incoming_cmd = GetCommand(&FalconClientSocket);
+	// Pop the full message
+	FalconMessage msg = GetCommand(&FalconClientSocket);
 
-	sq_pushinteger(v, (int)incoming_cmd.type);
-	//sq_pushinteger(v, incoming_cmd.len);
+	// Create a new Squirrel table on the stack: {}
+	sq_newtable(v);
+
+	// Add the 'type' slot
+	sq_pushstring(v, _SC("type"), -1);		// Push key "type"
+	sq_pushinteger(v, (int)msg.type);		// Push value (e.g., 2)
+	sq_newslot(v, -3, SQFalse);				// Create slot: { type: 2 }
+
+	// Add the 'data' slot (as an array)
+	sq_pushstring(v, _SC("data"), -1);		// Push key "data"
+	sq_newarray(v, 0);
+
+	// Fill the array with floats from the payload
+	for (size_t i = 0; i < msg.payload.size(); i++) {
+		sq_pushfloat(v, msg.payload[i]);	// Push float value
+		sq_arrayappend(v, -2);				// Append to array
+	}
+
+	sq_newslot(v, -3, SQFalse);				// Create slot: { type: 2, data: [...] }
+
+	// Return 1, indicating we are returning ONE object (the table)
 	return 1;
 }
 SQ_BIND_GLOBAL_METHOD(getCommand);
