@@ -64,7 +64,7 @@ server_thread.start()
 print("Server thread started.")
 
 # --- DearPyGUI Main Loop ---
-dpg.create_viewport(title='GUI Control Panel', width=1000, height=600)
+dpg.create_viewport(title='GUI Control Panel', width=1000, height=800)
 dpg.setup_dearpygui()
 dpg.show_viewport()
 dpg.set_primary_window("primary_window", True)
@@ -78,8 +78,11 @@ while dpg.is_dearpygui_running():
         x, y, z = data_queue.get_nowait()
         # If we successfully got data, update the display
         # This is the ONLY place you should call GUI update functions.
+        # Update sliders
         update_pos_display(x, y, z)
-        update_plot_data(new_x = x)
+        
+        # Update the plots with all 3 axes
+        update_plot_data(new_x=x, new_y=y, new_z=z)
 
     except queue.Empty:
         # This is the nomal case when no new data has arrived since the last frame

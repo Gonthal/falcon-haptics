@@ -1,46 +1,109 @@
 import dearpygui.dearpygui as dpg
 import time
 import collections
+import csv
+import datetime
 
-t_data = collections.deque(maxlen=100) # Limit to 100 data points
-x_data = collections.deque(maxlen=100)
+# --- Data storage ---
+# Moving window data for the live plots (fast, fixed size)
+MAX_SAMPLES = 500
+plot_t = collections.deque(maxlen=MAX_SAMPLES)
+plot_x = collections.deque(maxlen=MAX_SAMPLES)
+plot_y = collections.deque(maxlen=MAX_SAMPLES)
+plot_z = collections.deque(maxlen=MAX_SAMPLES)
 
-def update_plot_data(new_x: float):
-    # New data points
-    sample = 1
-    t0 = time.time()
-    frequency = 1.0
-    
-    while True:
-        # Get new data sample.
-        new_time = time.time() - t0
-        t_data.append(new_time)
-        x_data.append(new_x)
+# Full history data for export (grows indefinitely)
+full_history = {
+    "t": [],
+    "x": [],
+    "y": [],
+    "z": []
+}
 
-        # Set the series x and y to the last 100 samples
-        dpg.set_value("falcon_pos_series", list(t_data), list(x_data))
-        dpg.fit_axis_data("t_axis")
-        dpg.fit_axis_data("pos_axis")
+# State variables
+start_time = None
+t_plot = 0
 
-        time.sleep(0.01)
-        sample=sample + 1
+def export_data_callback():
+    """Saves the full history to a CSV file."""
+    return 1
 
-    t_data.append(new_time)
-    x_data.append(new_x)
+def update_plot_data(new_x: float, new_y: float, new_z: float):
+    """
+    Called every frame by the main loop to push new sensor data.
+    """
 
-    # Update the plot series
-    dpg.configure_item("falcon_pos_series", x=list(t_data), y=list(x_data))
+    global start_time
+    # Initialize start time on first data point
+    if start_time is None:
+        start_time = time.time()
 
-    # Schedule the next update
-    dpg.set_frame_callback(dpg.get_frame_count() + 1, update_plot_data)
+    current_t = time.time() - start_time
+
+    # Update moving window (for GUI)
+    plot_t.append(current_t)
+    plot_x.append(new_x)
+    plot_y.append(new_y)
+    plot_z.append(new_z)
+
+    # Update full history (for export)
+    full_history["t"].append(current_t)
+    full_history["x"].append(new_x)
+    full_history["y"].append(new_y)
+    full_history["z"].append(new_z)
+
+    # Update the DPG series, all 3 series
+    # Note: Lists are created from deques because DPG requires list/array types
+    dpg.configure_item("series_tag_x", x=list(plot_t), y=list(plot_x))
+    dpg.configure_item("series_tag_y", x=list(plot_t), y=list(plot_y))
+    dpg.configure_item("series_tag_z", x=list(plot_t), y=list(plot_z))
+
+    dpg.set_axis_limits("axis_t_z", current_t - 10, current_t)
+    dpg.set_axis_limits("axis_t_y", current_t - 10, current_t)
+    dpg.set_axis_limits("axis_t_x", current_t - 10, current_t)
+
+    # Optional: Auto-fit axes periodically or on every frame if needed
+    # dpg.fit_axis_data("x_axis_t")
+    # (Leaving auto-fit off is usually smoother for moving windows, 
+    #  let DPG handle the auto-scroll if "Auto-fit" is checked in the GUI menu)
 
 def create_plot_widget(parent_window) -> None:
-    """Creates the DearPyGUI for plotting the Falcon's position"""
+    """Creates the vertical stack of plots."""
+    # Button to trigger CSV export
+    dpg.add_button(label="Export to CSV", callback=export_data_callback, parent=parent_window)
+    dpg.add_separator(parent=parent_window)
 
-    #with dpg.group(tag="plot_widget"):
-    with dpg.plot(label="Falcon Position v. Time", height=-1, width=-1):
-        #dpg.add_plot_legend()
-        # REQUIRED: create t and pos axes, set to auto scale.
-        t_axis = dpg.add_plot_axis(dpg.mvXAxis, label="Time (s)", tag="t_axis")
-        y_axis = dpg.add_plot_axis(dpg.mvYAxis, label="Position (cm)", tag="pos_axis")
-        dpg.add_line_series(x=list(t_data), y=list(x_data), label="x", parent="pos_axis", tag="falcon_pos_series")
+    # We use a subplots container to stack them nicely,
+    # OR just add 3 separate plot widgets.
+    # Using 3 separate widgets allows individual control easier for now
+
+    # --- Z axis plot (Top) ---
+    with dpg.plot(label="Z Axis", height=170, width=-1, parent=parent_window):
+        dpg.add_plot_legend()
+        # X-axis (hidden label to save space, since they align)
+        dpg.add_plot_axis(dpg.mvXAxis, label="", tag="axis_t_z")
+        dpg.set_axis_limits(dpg.last_item(), -10, 0)
+        with dpg.plot_axis(dpg.mvYAxis, label="Z (cm)"):
+            dpg.set_axis_limits(dpg.last_item(), -7, 3)
+            dpg.add_line_series([], [], label="Z Pos", tag="series_tag_z")
+
+            # --- Y Axis Plot (Middle) ---
+    with dpg.plot(label="Y Axis", height=170, width=-1, parent=parent_window):
+        dpg.add_plot_legend()
+        dpg.add_plot_axis(dpg.mvXAxis, label="", tag="axis_t_y")
+        dpg.set_axis_limits(dpg.last_item(), -10, 0)
+        with dpg.plot_axis(dpg.mvYAxis, label="Y (cm)"):
+            dpg.set_axis_limits(dpg.last_item(), -5, 5)
+            # Set color to something different, e.g., Green
+            dpg.add_line_series([], [], label="Y Pos", tag="series_tag_y")
+            # To change color, you'd use a theme, but default is fine for now
+
+            # --- X Axis Plot (Bottom) ---
+    with dpg.plot(label="X Axis", height=180, width=-1, parent=parent_window):
+        dpg.add_plot_legend()
+        # Bottom plot gets the X-axis label
+        dpg.add_plot_axis(dpg.mvXAxis, label="Time (s)", tag="axis_t_x")
+        dpg.set_axis_limits(dpg.last_item(), -10, 0)
+        with dpg.plot_axis(dpg.mvYAxis, label="X (cm)"):
+            dpg.set_axis_limits(dpg.last_item(), -5, 5)
+            dpg.add_line_series([], [], label="X Pos", tag="series_tag_x")

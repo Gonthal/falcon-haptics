@@ -15,7 +15,7 @@ def create_sandbox_tab(parent_tab_bar, command_queue) -> None:
         dpg.add_separator()
 
         with dpg.group(horizontal=True):
-            with dpg.child_window(width=500, height=450, tag="kinematics_position_child"):
+            with dpg.child_window(width=500, height=700, tag="kinematics_position_child"):
                 dpg.add_text("Kinematics")
                 create_position_widget(parent_window="kinematics_position_child")
                 create_plot_widget(parent_window="kinematics_position_child")
