@@ -26,7 +26,33 @@ t_plot = 0
 
 def export_data_callback():
     """Saves the full history to a CSV file."""
-    return 1
+    if not full_history["t"]:
+        print("No data to export.")
+        return
+    
+    # Generate a unique filename based on timestamp
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"falcon_data{timestamp}.csv"
+
+    try:
+        with open(filename, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            # Write header
+            writer.writerow(["Time_s", "Pos_X_cm", "Pos_Y_cm", "Pos_Z_cm"])
+
+            # Write data rows
+            # zip combines the lists into rows: (t[0], x[0], y[0], z[0]), etc.
+            rows = zip(
+                full_history["t"],
+                full_history["x"],
+                full_history["y"],
+                full_history["z"]                
+            )
+            writer.writerows(rows)
+
+        print(f"Succesfully exported data to {filename}")
+    except Exception as e:
+        print(f"Failed to export data: {e}")
 
 def update_plot_data(new_x: float, new_y: float, new_z: float):
     """
