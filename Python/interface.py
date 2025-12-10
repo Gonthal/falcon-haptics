@@ -5,6 +5,7 @@ import queue
 from server_handler import start_server
 from widgets.pos_widget import update_pos_display
 from widgets.plots_widget import update_plot_data
+from widgets.effects_widget import update_visualizer
 from tabs.sandbox_tab import create_sandbox_tab
 
 # 1. Create the thread-safe queue that will be shared between the server and GUI
@@ -29,7 +30,7 @@ def send_test_command():
 # --- GUI Setup ---
 dpg.create_context()
 
-with dpg.window(label="erishito puede sher", tag="primary_window", width=800, height=600):
+with dpg.window(label="erishito puede sher", tag="primary_window", width=1100, height=800):
     # Create a tab bar that will hold all the main tabs
     with dpg.tab_bar(tag="main_tab_bar"):
         # Sandbox tab: kinematics, plots, haptic effects
@@ -64,7 +65,7 @@ server_thread.start()
 print("Server thread started.")
 
 # --- DearPyGUI Main Loop ---
-dpg.create_viewport(title='GUI Control Panel', width=1000, height=800)
+dpg.create_viewport(title='GUI Control Panel', width=1100, height=800)
 dpg.setup_dearpygui()
 dpg.show_viewport()
 dpg.set_primary_window("primary_window", True)
@@ -83,6 +84,10 @@ while dpg.is_dearpygui_running():
         
         # Update the plots with all 3 axes
         update_plot_data(new_x=x, new_y=y, new_z=z)
+
+        mouse_x, mouse_y = dpg.get_drawing_mouse_pos()
+        # Update the shape size based on Z
+        update_visualizer(x_pos=x, y_pos=y, z_pos=z)
 
     except queue.Empty:
         # This is the nomal case when no new data has arrived since the last frame
