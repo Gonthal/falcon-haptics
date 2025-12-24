@@ -173,24 +173,6 @@ def update_visualizer(x_pos:float, y_pos:float, z_pos: float) -> None:
 
     # Helper text
     dpg.draw_text(pos=[10, 10], text=f"Effect: {current_effect_id}", size=15, color=(150, 150, 150, 255), parent=canvas)
-    
-    
-    # First, get mouse position relative to the drawlist
-    # Note: get_drawing_mouse_pos() is used so coordinates match the canvas
-    #mouse_x, mouse_y = dpg.get_drawing_mouse_pos()
-
-    # Then, we calculate the radius based on the Falcon's Z
-    # Falcon's Z usually ranges from -0.06 to +0.06 meters
-    # So, let us map that to a radius from 5px to 50px
-    #base_radius = 25
-    #scale_factor = 4.0
-    #radius = base_radius + (z_pos * scale_factor)
-
-    # Radius is clamped to reasonable limits so it does not disappear or cover every everything
-    #radius = max(5.0, min(radius, 80.0))
-
-    # Circle is updated
-    #dpg.configure_item("cursor_circle", center=[mouse_x, mouse_y], radius=radius)
 
 def create_effects_widget(parent_window, command_queue) -> None:
     """Creates the DearPyGUI widget for effect settings."""

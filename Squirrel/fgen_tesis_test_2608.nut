@@ -105,7 +105,7 @@ gRockRecoil <- effectparameters(gEnvelopeEffectID, gEffectsStack); // create the
 gRockRecoil.setvarelement("force", 0, 0);   // 0 newtons right-wards
 gRockRecoil.setvarelement("force", 1, 0);   // 0 newtons upwards
 gRockRecoil.setvarelement("force", 2, 20);  // 20 newtons backwards
-gRockRecoil.setvar("attack", 10);           // ramp up to the force over 30 milliseconds
+gRockRecoil.setvar("attack", 10);           // ramp up to the force over 10 milliseconds
 gRockRecoil.setvar("hold", 0);              // no hold time once at maximum force
 gRockRecoil.setvar("decay", 0);             // no fall off time at end of effect
 const ROCK_THRESHOLD = 0.01;  // 1 cm
