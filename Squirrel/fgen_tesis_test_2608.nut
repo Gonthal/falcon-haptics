@@ -65,11 +65,7 @@ gFrameCounter <- 0;
 gStackConnected <- false;
 
 gPosition <- { x = 0.0, y = 0.0, z = 0.0 };
-gLastPosition <- {
-	x = 0.0,
-	y = 0.0,
-	z = 0.0
-};
+gLastPosition <- { x = 0.0, y = 0.0, z = 0.0 };
 gTextureAnchor <- { x = 0.0, y = 0.0, z = 0.0 };
 gLastFramePos <- { x = 0.0, y = 0.0, z = 0.0 };
 
@@ -98,16 +94,58 @@ gTimeSinceLastRead <- 0.0;
 
 // --- Create the effect stack ---
 gEffectsStack <- effectstack("effects", 1.0);      // creating default Falcon effect stack
-gEnvelopeEffectID <- registereffect("Envelope");   // registering           // no fall off time at end of effect
+gEnvelopeEffectID <- registereffect("Envelope");   // registering
 
 // --- ROCK RECOIL ---
-gRockRecoil <- effectparameters(gEnvelopeEffectID, gEffectsStack); // create the effect
-gRockRecoil.setvarelement("force", 0, 0);   // 0 newtons right-wards
-gRockRecoil.setvarelement("force", 1, 0);   // 0 newtons upwards
-gRockRecoil.setvarelement("force", 2, 20);  // 20 newtons backwards
-gRockRecoil.setvar("attack", 10);           // ramp up to the force over 10 milliseconds
-gRockRecoil.setvar("hold", 0);              // no hold time once at maximum force
-gRockRecoil.setvar("decay", 0);             // no fall off time at end of effect
+// Back face of the cube
+gRockRecoilPush <- effectparameters(gEnvelopeEffectID, gEffectsStack); // create the effect
+gRockRecoilPush.setvarelement("force", 0, 0);   // 0 newtons right-wards
+gRockRecoilPush.setvarelement("force", 1, 0);   // 0 newtons upwards
+gRockRecoilPush.setvarelement("force", 2, 20);  // 20 newtons backwards
+gRockRecoilPush.setvar("attack", 10);           // ramp up to the force over 10 milliseconds
+gRockRecoilPush.setvar("hold", 0);              // no hold time once at maximum force
+gRockRecoilPush.setvar("decay", 0);             // no fall off time at end of effect
+
+gRockRecoilPull <- effectparameters(gEnvelopeEffectID, gEffectsStack); // create the effect
+gRockRecoilPull.setvarelement("force", 0, 0);   // 0 newtons right-wards
+gRockRecoilPull.setvarelement("force", 1, 0);   // 0 newtons upwards
+gRockRecoilPull.setvarelement("force", 2, -20); // 20 newtons front-wards
+gRockRecoilPull.setvar("attack", 10);           // ramp up to the force over 10 milliseconds
+gRockRecoilPull.setvar("hold", 0);              // no hold time once at maximum force
+gRockRecoilPull.setvar("decay", 0);             // no fall off time at end of effect
+
+gRockRecoilLeft <- effectparameters(gEnvelopeEffectID, gEffectsStack); // create the effect
+gRockRecoilLeft.setvarelement("force", 0, -20); // 20 newtons left-wards
+gRockRecoilLeft.setvarelement("force", 1, 0);   // 0 newtons upwards
+gRockRecoilLeft.setvarelement("force", 2, 0);   // 0 newtons backwards
+gRockRecoilLeft.setvar("attack", 10);           // ramp up to the force over 10 milliseconds
+gRockRecoilLeft.setvar("hold", 0);              // no hold time once at maximum force
+gRockRecoilLeft.setvar("decay", 0);             // no fall off time at end of effect
+
+gRockRecoilRight <- effectparameters(gEnvelopeEffectID, gEffectsStack); // create the effect
+gRockRecoilRight.setvarelement("force", 0, 20);  // 20 newtons right-wards
+gRockRecoilRight.setvarelement("force", 1, 0);   // 0 newtons upwards
+gRockRecoilRight.setvarelement("force", 2, 0);   // 0 newtons backwards
+gRockRecoilRight.setvar("attack", 10);           // ramp up to the force over 10 milliseconds
+gRockRecoilRight.setvar("hold", 0);              // no hold time once at maximum force
+gRockRecoilRight.setvar("decay", 0);             // no fall off time at end of effect
+
+gRockRecoilUp <- effectparameters(gEnvelopeEffectID, gEffectsStack); // create the effect
+gRockRecoilUp.setvarelement("force", 0, 0);   // 0 newtons right-wards
+gRockRecoilUp.setvarelement("force", 1, 20);  // 0 newtons upwards
+gRockRecoilUp.setvarelement("force", 2, 0);   // 20 newtons backwards
+gRockRecoilUp.setvar("attack", 10);           // ramp up to the force over 10 milliseconds
+gRockRecoilUp.setvar("hold", 0);              // no hold time once at maximum force
+gRockRecoilUp.setvar("decay", 0);             // no fall off time at end of effect
+
+gRockRecoilDown <- effectparameters(gEnvelopeEffectID, gEffectsStack); // create the effect
+gRockRecoilDown.setvarelement("force", 0, 0);   // 0 newtons right-wards
+gRockRecoilDown.setvarelement("force", 1, -20); // 0 newtons downwards
+gRockRecoilDown.setvarelement("force", 2, 0);   // 20 newtons backwards
+gRockRecoilDown.setvar("attack", 10);           // ramp up to the force over 10 milliseconds
+gRockRecoilDown.setvar("hold", 0);              // no hold time once at maximum force
+gRockRecoilDown.setvar("decay", 0);             // no fall off time at end of effect
+
 const ROCK_THRESHOLD = 0.01;  // 1 cm
 
 // --- SANDPAPER RECOIL ---
@@ -132,6 +170,20 @@ gEffectTypeTable.water     <- 5;
 // Now, let us create the effect type variable
 gEffectType <- gEffectTypeTable.noeffect; // by default, there is no effect in place
 
+// --- ---
+// Used to identify which face of the cube we are touching
+gCubeFacesTable <- {};
+gCubeFacesTable.none  <- 0;
+gCubeFacesTable.back  <- 1;
+gCubeFacesTable.front <- 2;
+gCubeFacesTable.left  <- 3;
+gCubeFacesTable.right <- 4;
+gCubeFacesTable.up    <- 5;
+gCubeFacesTable.down  <- 6;
+//
+gCubeFaceTouched <- gCubeFacesTable.none; // by default, none of the faces is being touched
+
+
 
 // --- Create the control box stack ---
 gControlBoxStack <- effectstack("ControlBox", 1.0);
@@ -139,17 +191,22 @@ gControlBoxStack <- effectstack("ControlBox", 1.0);
 gControlBoxEffectID <- registereffect("ControlBox");
 gControlBox <- null; // variable to store the control box in
 
-
-gTestControlBox <- null;
-
 // --- Create the movement effect stack ---
 // Create a separate effects stack for movement forces
 gMovementStack <- effectstack("movement", 1.0);
-//Create a constant effect type
+// Create a constant effect type
 gConstantEffectID <- registereffect("Constant");
 // create the effect parameters for a constant effect for use as a movement force
 gMovementEffectParameters <- effectparameters(gConstantEffectID, gMovementStack);
 gMovementForce <- null;
+
+// --- Create tge effect parameters for a constant effect for use as a BOUNDARY force ---
+gBoundaryStack <- effectstack("boundary", 1.0);
+gBoundaryEffectID <- registereffect("Constant");
+gBoundaryEffectParameters <- effectparameters(gBoundaryEffectID, gBoundaryStack);
+gBoundaryForce <- null;
+
+
 //========================================================
 // functions
 //========================================================
@@ -164,10 +221,22 @@ function calc_3d_distance (pos1, pos2) {
 	return sqrt(dx*dx + dy*dy + dz*dz);
 }
 
-function calc_2d_distance(pos1, pos2) {
-	local dx = pos2.x - pos1.x;
-	local dy = pos2.y - pos1.y;
-	return sqrt(dx*dx + dy*dy);
+function calc_2d_distance(pos1, pos2, orientation) {
+	local du;
+	local dv;
+	if (orientation == 'x') {
+		;
+	} else if (orientation == 'y') {
+		local dy = pos2.y - pos1.y;
+		local dz = pos2.z - pos1.z;
+		du = dy;
+		dv = dz
+	} else if (orientation == 'z') {
+		;
+	}
+	//local dx = pos2.x - pos1.x;
+	//local dy = pos2.y - pos1.y;
+	return sqrt(du*du + dv*dv);
 }
 
 function decodeCommand(cmd) {
@@ -187,8 +256,18 @@ function decodeCommand(cmd) {
 	//gCommandQueue.dequeue();
 }
 
-function executeBoundaryForce(directions) {
-	return null;
+function executeCubeBoundaries (velocity) {
+	local moveX = 0.0;
+	local moveY = 0.0;
+	local moveZ = 0.0;
+
+	print(velocity.x + "\n");
+	if (gPosition.x <= -0.02) {
+		//print("Left boundary \n");
+		moveX = 5.0;
+	}
+
+	gBoundaryForce.setforce(moveX, moveY, moveZ);
 }
 
 function executeEffect (velocity, deltaTime) {
@@ -199,7 +278,7 @@ function executeEffect (velocity, deltaTime) {
 
 		case gEffectTypeTable.rock:
 			if (calc_2d_distance(gPosition, gTextureAnchor) >= ROCK_THRESHOLD) {
-				gRockRecoil.fire();
+				//gRockRecoilBack.fire();
 				gTextureAnchor.x = gPosition.x;
 				gTextureAnchor.y = gPosition.y;
 				gTextureAnchor.z = gPosition.z;
@@ -297,34 +376,40 @@ function ConnectOrDisconnectStacks (deviceHandle, bConnect) {
 	gEffectsStack.setdevicelock(false);
 	gControlBoxStack.setdevicelock(false);
 	gMovementStack.setdevicelock(false);
+	gBoundaryStack.setdevicelock(false);
 
 	if (bConnect) {
 		// add the device to the stacks, input slot 0
 		gEffectsStack.adddevice(deviceHandle, 0);
 		gControlBoxStack.adddevice(deviceHandle, 0);
 		gMovementStack.adddevice(deviceHandle, 0);
+		gBoundaryStack.adddevice(deviceHandle, 0);
 	} else {
 		// remove the device from the stacks, input slot 0
 		gEffectsStack.removedevice(deviceHandle, 0);
 		gControlBoxStack.removedevice(deviceHandle, 0);
 		gMovementStack.removedevice(deviceHandle, 0);
+		gBoundaryStack.removedevice(deviceHandle, 0);
 	}
 
 	// lock the device list on the stacks
 	gEffectsStack.setdevicelock(true);
 	gControlBoxStack.setdevicelock(true);
 	gMovementStack.setdevicelock(true);
+	gBoundaryStack.setdevicelock(true);
 
 	if (bConnect) {
 		// connect the stacks to the device for output
 		deviceconnectstack(deviceHandle, gEffectsStack);
 		deviceconnectstack(deviceHandle, gControlBoxStack);
 		deviceconnectstack(deviceHandle, gMovementStack);
+		deviceconnectstack(deviceHandle, gBoundaryStack);
 	} else {
 		// disconnect the stacks from the device
 		devicedisconnectstack(deviceHandle, gEffectsStack);
 		devicedisconnectstack(deviceHandle, gControlBoxStack);
 		devicedisconnectstack(deviceHandle, gMovementStack);
+		devicedisconnectstack(deviceHandle, gBoundaryStack);
 	}
 }
 //-------------------------------------------------------------
@@ -359,6 +444,7 @@ function HapticsActivated (deviceHandle)
 	ConnectOrDisconnectStacks(deviceHandle, true);
 	// launch the movement force
 	gMovementForce = constantforce(gMovementEffectParameters, gMovementStack);
+	gBoundaryForce = constantforce(gBoundaryEffectParameters, gBoundaryStack);
 	print("Script Activated\n");
 }
 
@@ -416,6 +502,7 @@ function HapticsThink (deviceHandle)
 		velocity.z = (gPosition.z - gLastFramePos.z) / deltaTime;
 	}
 
+	executeCubeBoundaries(velocity);
 	executeEffect(velocity, deltaTime);
 
 	gTimeSinceLastSend += deltaTime;
@@ -525,6 +612,10 @@ function HapticsDeactivated (deviceHandle)
 	// remove the movement force
 	gMovementForce.dispose();
 	gMovementForce = null;
+
+	// remove the boundary force
+	gBoundaryForce.dispose();
+	gBoundaryForce = null;
 	print("Script Deactivated\n");
 }
 

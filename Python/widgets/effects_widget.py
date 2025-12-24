@@ -32,9 +32,6 @@ def project_point(x, y, z, canvas_width, canvas_height):
     Projects a 3D point (x, y, z) onto a 2D screen (screen_x, screen_y).
     Uses a simple weak perspective projection.
     """
-    # Camera / View settings
-    #scale = 1000.0   # Pixels per unit (zoom)
-    #cam_dist = 40.0 # Distance of camera from origin
 
     scale_tag = "cube_scale_slider"
     cam_dist_tag = "cube_cam_dist_slider"
