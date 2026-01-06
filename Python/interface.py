@@ -30,7 +30,7 @@ def send_test_command():
 # --- GUI Setup ---
 dpg.create_context()
 
-with dpg.window(label="erishito puede sher", tag="primary_window", width=1100, height=800):
+with dpg.window(label="erishito puede sher", tag="primary_window", width=1500, height=800):
     # Create a tab bar that will hold all the main tabs
     with dpg.tab_bar(tag="main_tab_bar"):
         # Sandbox tab: kinematics, plots, haptic effects
@@ -65,7 +65,7 @@ server_thread.start()
 print("Server thread started.")
 
 # --- DearPyGUI Main Loop ---
-dpg.create_viewport(title='GUI Control Panel', width=1100, height=800)
+dpg.create_viewport(title='GUI Control Panel', width=1300, height=800)
 dpg.setup_dearpygui()
 dpg.show_viewport()
 dpg.set_primary_window("primary_window", True)

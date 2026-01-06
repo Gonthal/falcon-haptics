@@ -149,13 +149,53 @@ gRockRecoilDown.setvar("decay", 0);             // no fall off time at end of ef
 const ROCK_THRESHOLD = 0.01;  // 1 cm
 
 // --- SANDPAPER RECOIL ---
-gSandpaperRecoil <- effectparameters(gEnvelopeEffectID, gEffectsStack); // create the effect
-gSandpaperRecoil.setvarelement("force", 0, 0);   // 0 newtons right-wards
-gSandpaperRecoil.setvarelement("force", 1, 0);   // 0 newtons upwards
-gSandpaperRecoil.setvarelement("force", 2, 5);   // 5 newtons backwards
-gSandpaperRecoil.setvar("attack", 10);           // ramp up to the force over 10 milliseconds
-gSandpaperRecoil.setvar("hold", 0);              // no hold time once at maximum force
-gSandpaperRecoil.setvar("decay", 0);             // no fall off time at end of effect
+gSandpaperRecoilPush <- effectparameters(gEnvelopeEffectID, gEffectsStack); // create the effect
+gSandpaperRecoilPush.setvarelement("force", 0, 0);   // 0 newtons right-wards
+gSandpaperRecoilPush.setvarelement("force", 1, 0);   // 0 newtons upwards
+gSandpaperRecoilPush.setvarelement("force", 2, 5);   // 5 newtons backwards
+gSandpaperRecoilPush.setvar("attack", 10);           // ramp up to the force over 10 milliseconds
+gSandpaperRecoilPush.setvar("hold", 0);              // no hold time once at maximum force
+gSandpaperRecoilPush.setvar("decay", 0);             // no fall off time at end of effect
+
+gSandpaperRecoilPull <- effectparameters(gEnvelopeEffectID, gEffectsStack); // create the effect
+gSandpaperRecoilPull.setvarelement("force", 0, 0);   // 0 newtons right-wards
+gSandpaperRecoilPull.setvarelement("force", 1, 0);   // 0 newtons upwards
+gSandpaperRecoilPull.setvarelement("force", 2, -5);   // 5 newtons backwards
+gSandpaperRecoilPull.setvar("attack", 10);           // ramp up to the force over 10 milliseconds
+gSandpaperRecoilPull.setvar("hold", 0);              // no hold time once at maximum force
+gSandpaperRecoilPull.setvar("decay", 0);             // no fall off time at end of effect
+
+gSandpaperRecoilLeft <- effectparameters(gEnvelopeEffectID, gEffectsStack); // create the effect
+gSandpaperRecoilLeft.setvarelement("force", 0, -5);   // 0 newtons right-wards
+gSandpaperRecoilLeft.setvarelement("force", 1, 0);   // 0 newtons upwards
+gSandpaperRecoilLeft.setvarelement("force", 2, 0);   // 5 newtons backwards
+gSandpaperRecoilLeft.setvar("attack", 10);           // ramp up to the force over 10 milliseconds
+gSandpaperRecoilLeft.setvar("hold", 0);              // no hold time once at maximum force
+gSandpaperRecoilLeft.setvar("decay", 0);             // no fall off time at end of effect
+
+gSandpaperRecoilRight <- effectparameters(gEnvelopeEffectID, gEffectsStack); // create the effect
+gSandpaperRecoilRight.setvarelement("force", 0, 5);   // 0 newtons right-wards
+gSandpaperRecoilRight.setvarelement("force", 1, 0);   // 0 newtons upwards
+gSandpaperRecoilRight.setvarelement("force", 2, 0);   // 5 newtons backwards
+gSandpaperRecoilRight.setvar("attack", 10);           // ramp up to the force over 10 milliseconds
+gSandpaperRecoilRight.setvar("hold", 0);              // no hold time once at maximum force
+gSandpaperRecoilRight.setvar("decay", 0);             // no fall off time at end of effect
+
+gSandpaperRecoilUp <- effectparameters(gEnvelopeEffectID, gEffectsStack); // create the effect
+gSandpaperRecoilUp.setvarelement("force", 0, 0);   // 0 newtons right-wards
+gSandpaperRecoilUp.setvarelement("force", 1, 5);   // 0 newtons upwards
+gSandpaperRecoilUp.setvarelement("force", 2, 0);   // 5 newtons backwards
+gSandpaperRecoilUp.setvar("attack", 10);           // ramp up to the force over 10 milliseconds
+gSandpaperRecoilUp.setvar("hold", 0);              // no hold time once at maximum force
+gSandpaperRecoilUp.setvar("decay", 0);             // no fall off time at end of effect
+
+gSandpaperRecoilDown <- effectparameters(gEnvelopeEffectID, gEffectsStack); // create the effect
+gSandpaperRecoilDown.setvarelement("force", 0, 0);   // 0 newtons right-wards
+gSandpaperRecoilDown.setvarelement("force", 1, -5);   // 0 newtons upwards
+gSandpaperRecoilDown.setvarelement("force", 2, 0);   // 5 newtons backwards
+gSandpaperRecoilDown.setvar("attack", 10);           // ramp up to the force over 10 milliseconds
+gSandpaperRecoilDown.setvar("hold", 0);              // no hold time once at maximum force
+gSandpaperRecoilDown.setvar("decay", 0);             // no fall off time at end of effect
 const SANDPAPER_THRESHOLD = 0.001; // 1 mm
 
 // --- Effect type table ---
@@ -171,18 +211,13 @@ gEffectTypeTable.water     <- 5;
 gEffectType <- gEffectTypeTable.noeffect; // by default, there is no effect in place
 
 // --- ---
-// Used to identify which face of the cube we are touching
-gCubeFacesTable <- {};
-gCubeFacesTable.none  <- 0;
-gCubeFacesTable.back  <- 1;
-gCubeFacesTable.front <- 2;
-gCubeFacesTable.left  <- 3;
-gCubeFacesTable.right <- 4;
-gCubeFacesTable.up    <- 5;
-gCubeFacesTable.down  <- 6;
-//
-gCubeFaceTouched <- gCubeFacesTable.none; // by default, none of the faces is being touched
-
+// Used to identify which face(s) of the cube is (are) being touched
+// Each orientation is given by a normal vector to the plane being touched
+gTouchedFaceOrientation <- {
+	x = 0,
+	y = 0,
+	z = 0
+}
 
 
 // --- Create the control box stack ---
@@ -222,21 +257,22 @@ function calc_3d_distance (pos1, pos2) {
 }
 
 function calc_2d_distance(pos1, pos2, orientation) {
-	local du;
-	local dv;
 	if (orientation == 'x') {
-		;
-	} else if (orientation == 'y') {
 		local dy = pos2.y - pos1.y;
 		local dz = pos2.z - pos1.z;
-		du = dy;
-		dv = dz
+		return sqrt(dy*dy + dz*dz);
+	} else if (orientation == 'y') {
+		local dx = pos2.x - pos1.x;
+		local dz = pos2.z - pos1.z;
+		return sqrt(dx*dx + dz*dz);
 	} else if (orientation == 'z') {
-		;
+		local dx = pos2.x - pos1.x;
+		local dy = pos2.y - pos1.y;
+		return sqrt(dx*dx + dy*dy);
 	}
 	//local dx = pos2.x - pos1.x;
 	//local dy = pos2.y - pos1.y;
-	return sqrt(du*du + dv*dv);
+	//return sqrt(du*du + dv*dv);
 }
 
 function decodeCommand(cmd) {
@@ -257,17 +293,104 @@ function decodeCommand(cmd) {
 }
 
 function executeCubeBoundaries (velocity) {
-	local moveX = 0.0;
-	local moveY = 0.0;
-	local moveZ = 0.0;
+	local forceX = 0.0;
+	local forceY = 0.0;
+	local forceZ = 0.0;
 
-	print(velocity.x + "\n");
-	if (gPosition.x <= -0.02) {
-		//print("Left boundary \n");
-		moveX = 5.0;
+	// --- Configuration ---
+	// Distance from the center to the wall (the units are in meters)
+	const WALL_LIMIT = 0.03;
+	local outer_limit = WALL_LIMIT + gPosition.z * 0.5;
+
+	// Stiffness: How "hard" the wall feels (N/m)
+	// Keep it between 800 and 1200. If it starts to buzz, decrease
+	const K_STIFFNESS = 1000.0;
+
+	// Damping: Prevents the bouncing (N/(m/s))
+	const K_DAMPING = 15.0;
+
+	// --- Left wall ---
+	if (gPosition.x < -outer_limit) {
+		// We are touching the left face of the cube
+		gTouchedFaceOrientation.x = -1;
+		local perforation = (-outer_limit) - gPosition.x;
+		// Spring pushes to the RIGHT (+)
+		local springForce = perforation * K_STIFFNESS;
+		// Damper resists velocity
+		local dampingForce = -velocity.x * K_DAMPING;
+		forceX = springForce + dampingForce;
+		// Constraint: Force must always push OUT, never pull in
+		if (forceX < 0.0) forceX = 0.0;
+	}
+	// --- Right Wall ---
+    else if (gPosition.x > outer_limit) {
+		gTouchedFaceOrientation.x = 1;
+        local perforation = gPosition.x - outer_limit;
+        local springForce = -perforation * K_STIFFNESS; // Push LEFT (-)
+        local dampingForce = -velocity.x * K_DAMPING;
+
+        forceX = springForce + dampingForce;
+        if (forceX > 0.0) forceX = 0.0;
+    } else {
+		gTouchedFaceOrientation.x = 0;
 	}
 
-	gBoundaryForce.setforce(moveX, moveY, moveZ);
+    // --- Bottom Wall ---
+    if (gPosition.y < -outer_limit) {
+		gTouchedFaceOrientation.y = -1;
+        local perforation = (-outer_limit) - gPosition.y;
+        local springForce = perforation * K_STIFFNESS; // Push UP (+)
+        local dampingForce = -velocity.y * K_DAMPING;
+
+        forceY = springForce + dampingForce;
+        if (forceY < 0.0) forceY = 0.0;
+    }
+    // --- Top Wall ---
+    else if (gPosition.y > outer_limit) {
+		gTouchedFaceOrientation.y = 1;
+        local perforation = gPosition.y - outer_limit;
+        local springForce = -perforation * K_STIFFNESS; // Push DOWN (-)
+        local dampingForce = -velocity.y * K_DAMPING;
+
+        forceY = springForce + dampingForce;
+        if (forceY > 0.0) forceY = 0.0;
+    } else {
+		gTouchedFaceOrientation.y = 0;
+	}
+
+    // --- Back Wall ---
+    if (gPosition.z < -WALL_LIMIT) {
+		gTouchedFaceOrientation.z = -1;
+        local perforation = (-WALL_LIMIT) - gPosition.z;
+        local springForce = perforation * K_STIFFNESS; // Push FRONT (+)
+        local dampingForce = -velocity.z * K_DAMPING;
+
+        forceZ = springForce + dampingForce;
+        if (forceZ < 0.0) forceZ = 0.0;
+    }
+    // --- Front Wall ---
+    else if (gPosition.z > WALL_LIMIT - 0.01) {
+		gTouchedFaceOrientation.z = 1;
+        local perforation = gPosition.z - WALL_LIMIT;
+        local springForce = -perforation * K_STIFFNESS; // Push BACK (-)
+        local dampingForce = -velocity.z * K_DAMPING;
+
+        forceZ = springForce + dampingForce;
+        if (forceZ > 0.0) forceZ = 0.0;
+    } else {
+		gTouchedFaceOrientation.z = 0;
+	}
+
+	// --- Safety clamp ---
+	const MAX_FORCE = 20.0;
+	if (forceX > MAX_FORCE) forceX = MAX_FORCE;
+	if (forceX < -MAX_FORCE) forceX = -MAX_FORCE;
+	if (forceY > MAX_FORCE) forceY = MAX_FORCE;
+	if (forceY < -MAX_FORCE) forceY = -MAX_FORCE;
+	if (forceZ > MAX_FORCE) forceZ = MAX_FORCE;
+	if (forceZ < -MAX_FORCE) forceZ = -MAX_FORCE;
+
+	gBoundaryForce.setforce(forceX, forceY, forceZ);
 }
 
 function executeEffect (velocity, deltaTime) {
@@ -277,21 +400,116 @@ function executeEffect (velocity, deltaTime) {
 			break;
 
 		case gEffectTypeTable.rock:
-			if (calc_2d_distance(gPosition, gTextureAnchor) >= ROCK_THRESHOLD) {
+			if (gTouchedFaceOrientation.x == -1) {
+				if (calc_2d_distance(gPosition, gTextureAnchor, 'x') >= ROCK_THRESHOLD) {
+					gRockRecoilPush.fire();
+					gTextureAnchor.x = gPosition.x;
+					gTextureAnchor.y = gPosition.y;
+					gTextureAnchor.z = gPosition.z;
+				}
+			} else if (gTouchedFaceOrientation.x == 1) {
+				if (calc_2d_distance(gPosition, gTextureAnchor, 'x') >= ROCK_THRESHOLD) {
+					gRockRecoilPush.fire();
+					gTextureAnchor.x = gPosition.x;
+					gTextureAnchor.y = gPosition.y;
+					gTextureAnchor.z = gPosition.z;
+				}
+			}
+
+			if (gTouchedFaceOrientation.y == -1) {
+				if (calc_2d_distance(gPosition, gTextureAnchor, 'y') >= ROCK_THRESHOLD) {
+					gRockRecoilPush.fire();
+					gTextureAnchor.x = gPosition.x;
+					gTextureAnchor.y = gPosition.y;
+					gTextureAnchor.z = gPosition.z;
+				}
+			} else if (gTouchedFaceOrientation.y == 1) {
+				if (calc_2d_distance(gPosition, gTextureAnchor, 'y') >= ROCK_THRESHOLD) {
+					gRockRecoilPush.fire();
+					gTextureAnchor.x = gPosition.x;
+					gTextureAnchor.y = gPosition.y;
+					gTextureAnchor.z = gPosition.z;
+				}
+			}
+
+			if (gTouchedFaceOrientation.z == -1) {
+				if (calc_2d_distance(gPosition, gTextureAnchor, 'z') >= ROCK_THRESHOLD) {
+					gRockRecoilPush.fire();
+					gTextureAnchor.x = gPosition.x;
+					gTextureAnchor.y = gPosition.y;
+					gTextureAnchor.z = gPosition.z;
+				}
+			} else if (gTouchedFaceOrientation.z == 1) {
+				if (calc_2d_distance(gPosition, gTextureAnchor, 'z') >= ROCK_THRESHOLD) {
+					gRockRecoilPull.fire();
+					gTextureAnchor.x = gPosition.x;
+					gTextureAnchor.y = gPosition.y;
+					gTextureAnchor.z = gPosition.z;
+				}
+			}
+			/*if (calc_2d_distance(gPosition, gTextureAnchor) >= ROCK_THRESHOLD) {
 				//gRockRecoilBack.fire();
 				gTextureAnchor.x = gPosition.x;
 				gTextureAnchor.y = gPosition.y;
 				gTextureAnchor.z = gPosition.z;
-			}
+			}*/
 			break;
 
 		case gEffectTypeTable.sandpaper:
-			if (calc_2d_distance(gPosition, gTextureAnchor) >= SANDPAPER_THRESHOLD) {
+			if (gTouchedFaceOrientation.x == -1) {
+				if (calc_2d_distance(gPosition, gTextureAnchor, 'x') >= SANDPAPER_THRESHOLD) {
+					gSandpaperRecoilPush.fire();
+					gTextureAnchor.x = gPosition.x;
+					gTextureAnchor.y = gPosition.y;
+					gTextureAnchor.z = gPosition.z;
+				}
+			} else if (gTouchedFaceOrientation.x == 1) {
+				if (calc_2d_distance(gPosition, gTextureAnchor, 'x') >= SANDPAPER_THRESHOLD) {
+					gSandpaperRecoilPush.fire();
+					gTextureAnchor.x = gPosition.x;
+					gTextureAnchor.y = gPosition.y;
+					gTextureAnchor.z = gPosition.z;
+				}
+			}
+
+			if (gTouchedFaceOrientation.y == -1) {
+				if (calc_2d_distance(gPosition, gTextureAnchor, 'y') >= SANDPAPER_THRESHOLD) {
+					gSandpaperRecoilPush.fire();
+					gTextureAnchor.x = gPosition.x;
+					gTextureAnchor.y = gPosition.y;
+					gTextureAnchor.z = gPosition.z;
+				}
+			} else if (gTouchedFaceOrientation.y == 1) {
+				if (calc_2d_distance(gPosition, gTextureAnchor, 'y') >= SANDPAPER_THRESHOLD) {
+					gSandpaperRecoilPush.fire();
+					gTextureAnchor.x = gPosition.x;
+					gTextureAnchor.y = gPosition.y;
+					gTextureAnchor.z = gPosition.z;
+				}
+			}
+
+			if (gTouchedFaceOrientation.z == -1) {
+				if (calc_2d_distance(gPosition, gTextureAnchor, 'z') >= SANDPAPER_THRESHOLD) {
+					gSandpaperRecoilPush.fire();
+					gTextureAnchor.x = gPosition.x;
+					gTextureAnchor.y = gPosition.y;
+					gTextureAnchor.z = gPosition.z;
+				}
+			} else if (gTouchedFaceOrientation.z == 1) {
+				if (calc_2d_distance(gPosition, gTextureAnchor, 'z') >= SANDPAPER_THRESHOLD) {
+					gSandpaperRecoilPull.fire();
+					gTextureAnchor.x = gPosition.x;
+					gTextureAnchor.y = gPosition.y;
+					gTextureAnchor.z = gPosition.z;
+				}
+			}
+
+			/*if (calc_2d_distance(gPosition, gTextureAnchor) >= SANDPAPER_THRESHOLD) {
 				gSandpaperRecoil.fire();
 				gTextureAnchor.x = gPosition.x;
 				gTextureAnchor.y = gPosition.y;
 				gTextureAnchor.z = gPosition.z;
-			}
+			}*/
 			break;
 
 		case gEffectTypeTable.oil:

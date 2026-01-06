@@ -21,7 +21,7 @@ def create_sandbox_tab(parent_tab_bar, command_queue) -> None:
                 create_position_widget(parent_window="kinematics_position_child")
                 create_plot_widget(parent_window="kinematics_position_child")
             # Haptic effects              
-            with dpg.child_window(width=500, height=420, tag="kinematics_config_child"):
+            with dpg.child_window(width=700, height=420, tag="sandbox_haptics_child"):
                 dpg.add_text("Haptics")
-                create_effects_widget(parent_window="kinematics_config_child", command_queue=command_queue)
+                create_effects_widget(parent_window="sandbox_haptics_child", command_queue=command_queue)
                 #dpg.add_separator()

@@ -176,7 +176,7 @@ def create_effects_widget(parent_window, command_queue) -> None:
 
     with dpg.group(horizontal=True, tag="haptics_widget"):
         # Left side: Effect Selection
-        with dpg.child_window(parent="parent_window", width=130, height=230):
+        with dpg.child_window(parent="parent_window", width=300, height=-1):
             dpg.add_text("Select an effect")
             # Radio button for mutually exclusive selection
             dpg.add_radio_button(
@@ -188,8 +188,14 @@ def create_effects_widget(parent_window, command_queue) -> None:
                 horizontal=False # Set to True if you want them side-by-side
             )
 
-            dpg.add_slider_float(tag="cube_scale_slider", width=-1, min_value=300.0, max_value=1000.0, default_value=300.0)
-            dpg.add_slider_float(tag="cube_cam_dist_slider", width=-1, min_value=10.0, max_value=60.0, default_value=40.0)
+            dpg.add_separator()
+
+            with dpg.group(horizontal=True):
+                dpg.add_text("Scale:   ")
+                dpg.add_slider_float(tag="cube_scale_slider", width=-1, min_value=300.0, max_value=1000.0, default_value=300.0)
+            with dpg.group(horizontal=True):
+                dpg.add_text("Distance:")
+                dpg.add_slider_float(tag="cube_cam_dist_slider", width=-1, min_value=10.0, max_value=60.0, default_value=40.0)
 
 
         # Right side: 3D cube visualizer
