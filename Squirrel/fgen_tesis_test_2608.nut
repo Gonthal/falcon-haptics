@@ -83,7 +83,7 @@ gCommandQueue <- CommandQueue();
 gKeyInput <- inputlistener();
 gScriptTime <- timekeeper();   // setup time checker, used for delta time
 gLastTime <- 0.0;			   // time at the end of the frame, initially set to 0
-const SEND_INTERVAL = 0.02;    // Send data every 0.02 seconds (50 Hz)
+const SEND_INTERVAL = 0.01;    // Send data every 0.02 seconds (50 Hz)
 const READ_INTERVAL = 0.002	   // Read data every 0.002 seconds (500 Hz)
 gTimeSinceLastSend <- 0.0;     // time since last data send
 gTimeSinceLastRead <- 0.0;
@@ -685,7 +685,7 @@ function HapticsThink (deviceHandle)
 		deltaTime = MAX_DELTA;
 	}
 
-	gKeyInput.update();
+	/*gKeyInput.update();*/
 
 	// optional debug
 	// if (gFrameCounter % 100 = 0) {
@@ -743,66 +743,14 @@ function HapticsThink (deviceHandle)
 	// --- Falcon button presses ---
 
 	if (devicewasbuttonjustpressed(deviceHandle, FALCON_LOGO)) {
-		/*if (gEffectType == gEffectTypeTable.noeffect) {
-			print("Rock!\n");
-			gEffectType = gEffectTypeTable.rock;
-		} else if (gEffectType == gEffectTypeTable.rock) {
-			print("Sandpaper!\n");
-			gEffectType = gEffectTypeTable.sandpaper;
-		} else if (gEffectType == gEffectTypeTable.sandpaper) {
-			print("Oil!\n");
-			gEffectType = gEffectTypeTable.oil;
-		} else if (gEffectType == gEffectTypeTable.oil) {
-			print("Water!\n");
-			gEffectType = gEffectTypeTable.water;
-		} else {
-			print("No effect!\n");
-			gEffectType = gEffectTypeTable.noeffect;
-		}*/
 		print("Logo\n");
 	}
 
 	if (devicewasbuttonjustpressed(deviceHandle, FALCON_TRIANGLE)) {
-		// cmd is a table: { type: ..., data = [...] }
-		/*local cmd = getCommand();
-
-		if (cmd.type != 100) {
-			print("The effect type is " + cmd.type + "\n");
-			gEffectType = cmd.type;
-		} else {
-			print("ERROR: invalidad command type \n");
-		}*/
-
-		/*if (cmd.type != 0) {
-			print("Received command type: " + cmd.type + "\n");
-
-			// Access payload data array
-			if (cmd.data.len() >= 3) {
-				print("Payload ");
-				foreach (idx, val in cmd.data) {
-					print(val + " ");
-				}
-				print("\n");
-
-				//local val1 = cmd.data[0];
-				//local val2 = cmd.data[1];
-				//local val3 = cmd.data[2];
-				//print("Payload: " + val1 + ", " + val2 + ", " + val3 + "\n");
-			} else {
-				print("Something went wrong with the command. \n");
-			}
-		}*/
 		print("Triangle\n");
 	}
 
 	if (devicewasbuttonjustpressed(deviceHandle, FALCON_LIGHTNING)) {
-		/*gTestControlBox.setvar("deadband", 0.3)
-		gControlBox = controlbox(gTestControlBox, gControlBoxStack);
-		if (gControlBox != null) {
-			setinputeffect(gControlBox);
-		} else {
-			print("Oops, something went wrong with the control box. \n")
-		}*/
 		print("Lightning\n");
 	}
 

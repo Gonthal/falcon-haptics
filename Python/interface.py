@@ -56,7 +56,7 @@ def run_server_in_thread() -> None:
     except Exception as e:
         print(f"Error in server thread: {e}")
 
-# 2. Start the server in a separate thread.
+# Start the server in a separate thread.
 # By setting 'daemon=True', the thread will automatically shut down
 # when the main program (the GUI) exits.
 print("Setting up server thread...")
