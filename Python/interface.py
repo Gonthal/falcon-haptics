@@ -73,31 +73,36 @@ dpg.set_primary_window("primary_window", True)
 
 print("Starting DearPyGUI render loop...")
 while dpg.is_dearpygui_running():
-    # 3. On every frame, check the queue for new data from the server thread
-    try:
-        # 'get_nowait()' is non-blocking. It gets an item if one is inmediately
-        # available, otherwise, it raises a queue.Empty exception
-        x, y, z = data_queue.get_nowait()
-        # If we successfully got data, update the display
-        # This is the ONLY place you should call GUI update functions.
-        # Update sliders
-        update_pos_display(x, y, z)
+    # DRAIN THE QUEUE
+    latest_pos = None
+
+    # Keep getting items until the queue is empty
+    while not data_queue.empty():
+        try:
+            latest_pos = data_queue.get_nowait()
+        except queue.Empty:
+            break
+
+    # If we got at least one packet, update the GUI with the LATEST one
+    if latest_pos:
+        x, y, z = latest_pos
         
-        # Update the plots with all 3 axes
+        update_pos_display(x, y, z)
         update_plot_data(new_x=x, new_y=y, new_z=z)
-
-        mouse_x, mouse_y = dpg.get_drawing_mouse_pos()
-        # Update the shape size based on Z
         update_visualizer(x_pos=x, y_pos=y, z_pos=z)
-
         app_tab.update_loop(x, y, z)
 
-    except queue.Empty:
-        # This is the nomal case when no new data has arrived since the last frame
-        # We simply do nothing and continue on to rendering
-        pass
+    # Check if the PyVista window was closed by the user
+    if hasattr(app_tab, 'plotter'):
+        if app_tab.plotter.render_window is None:
+            print("3D Window was closed by user.")
+            # Optional: break the loop here for the whole app to close down
+            # break
 
     dpg.render_dearpygui_frame()
 
 print("DearPyGUI render loop finished.")
+# AFTER the loop finishes (User closed DPG Window)
+if hasattr(app_tab, 'plotter') and not app_tab.plotter.closed:
+    app_tab.plotter.close()
 dpg.destroy_context()

@@ -1,120 +1,114 @@
 import dearpygui.dearpygui as dpg
-import math
+import pyvista as pv
+import numpy as np
 
 class ApplicationTab:
     def __init__(self, queue_to_falcon):
         self.queue = queue_to_falcon
-        self.sphere_radius = 3.5  # cm (world units)
-        self.stiffness = 5        # N/cm
+        self.sphere_radius = 0.035  # 3.5 cm
+        self.stiffness = 1000.0    # N/m
         self.is_active = False
-        self.proxy_x = 0.0  # Store proxy for visualization
-        self.proxy_y = 0.0
-        self.proxy_z = 0.0
-        self.model_data = None  # Placeholder for custom 3D model data (e.g., vertices, faces)
+        
+        # --- PYVISTA SETUP ---
+        # 1. Create the Plotter (The 3D Window)
+        # off_screen=False means it pops up a real window
+        self.plotter = pv.Plotter(window_size=[800, 600], title="Haptic Simulation View")
+        
+        # 2. Add the "Virtual Object" (The Green Sphere)
+        # Resolution=50 makes it look smooth
+        self.mesh_sphere = pv.Sphere(radius=self.sphere_radius, center=(0, 0, 0), theta_resolution=50, phi_resolution=50)
+        self.actor_sphere = self.plotter.add_mesh(self.mesh_sphere, color="green", opacity=0.5, show_edges=True)
+        
+        # 3. Add the "Cursor" (The Red Dot representing the Falcon)
+        self.cursor_mesh = pv.Sphere(radius=0.005, center=(0, 0, 0)) # 5mm cursor
+        self.actor_cursor = self.plotter.add_mesh(self.cursor_mesh, color="red")
+        
+        # 4. Add a "Proxy" (Ghost point on surface - Blue)
+        self.proxy_mesh = pv.Sphere(radius=0.004, center=(0,0,0))
+        self.actor_proxy = self.plotter.add_mesh(self.proxy_mesh, color="blue", opacity=0.0) # Invisible initially
+
+        # 5. Setup Camera
+        self.plotter.camera_position = [(0.2, 0.2, 0.2), (0, 0, 0), (0, 1, 0)]
+        self.plotter.show_grid()
+        
+        # CRITICAL: Do not call plotter.show() yet!
+        # We will manually trigger renders in the update loop.
+        self.plotter.show(auto_close=False, interactive_update=True)
 
     def render(self):
+        # This renders the CONTROLS in the DearPyGui window
         with dpg.group(horizontal=True):
-            # Left: Controls
-            with dpg.group(width=200):
-                dpg.add_text("Palpation demo")
-                dpg.add_checkbox(label="Activate Haptics", tag="btn_hap_active", callback=self.toggle_haptics)
-                # Implement sliders: Bind to self.stiffness and self.sphere_radius
-                dpg.add_slider_float(label="Stiffness", default_value=self.stiffness, max_value=10.0, callback=self.update_stiffness)
-                dpg.add_slider_float(label="Radius (cm)", default_value=self.sphere_radius, max_value=10.0, callback=self.update_radius)
-
-            # Right: 3D visualization (3D scene instead of 2D canvas)
-            with dpg.viewport_menu_bar():  # Required for 3D scenes
-                pass
-            with dpg.add_3d_scene(width=400, height=400, tag="3d_scene") as scene:
-                # Camera setup (simple top-down view)
-                dpg.set_camera_position(scene, (0, 0, 10))  # Position camera
-                dpg.set_camera_target(scene, (0, 0, 0))    # Look at origin
-                # Draw the model here every frame
-                pass
-
-    def update_stiffness(self, sender, data):
-        self.stiffness = data
-
-    def update_radius(self, sender, data):
-        self.sphere_radius = data
+            with dpg.group(width=250):
+                dpg.add_text("Medical Simulation Controls")
+                dpg.add_separator()
+                
+                dpg.add_checkbox(label="Activate Haptics", callback=self.toggle_haptics)
+                dpg.add_slider_float(label="Radius (m)", default_value=self.sphere_radius, 
+                                     min_value=0.01, max_value=0.10, callback=self.update_params)
+                dpg.add_slider_float(label="Stiffness (N/m)", default_value=self.stiffness, 
+                                     min_value=100.0, max_value=2000.0, callback=self.update_params)
+                
+                dpg.add_text("Note: 3D View is in the separate window.")
 
     def toggle_haptics(self, sender, data):
         self.is_active = data
-        cmd = None
-        if not self.is_active:
-            # Send "Turn OFF" command to Falcon
-            cmd = {
-                "type": 7,
-                "payload": [0.0]
-            }
+        if self.is_active:
+            self.send_model_to_falcon()
         else:
-            # Send model info (e.g., radius, stiffness) for proxy setup
-            cmd = {
-                "type": 9,  # New command: Send model params (extend Squirrel script to handle)
-                "payload": [self.sphere_radius, self.stiffness]  # Add more for custom models
-            }
+            # Send Disable Command
+            cmd = {"type": 7, "payload": [0.0]}
+            self.queue.put(cmd)
+
+    def update_params(self, sender, data):
+        if sender == "Radius (m)": 
+            self.sphere_radius = data
+            # Update visual mesh size
+            # PyVista doesn't allow changing radius easily, so we scale it
+            # Or simpler: just recreate the sphere mesh logic if needed, 
+            # but scaling the actor is faster:
+            # (Reset scale first to avoid compounding)
+            # This is a bit complex in VTK, so for a thesis, just re-generating the mesh is fine:
+            new_mesh = pv.Sphere(radius=self.sphere_radius, center=(0,0,0))
+            self.mesh_sphere.overwrite(new_mesh) # Updates the geometry in place
+            
+        if sender == "Stiffness (N/m)": 
+            self.stiffness = data
+            
+        if self.is_active:
+            self.send_model_to_falcon()
+
+    def send_model_to_falcon(self):
+        cmd = {
+            "type": 9,
+            "payload": [self.sphere_radius, self.stiffness]
+        }
         self.queue.put(cmd)
 
     def update_loop(self, x, y, z):
         """
-        Call this function every frame from your main loop (100Hz).
-        current_pos: (x, y, z) from Falcon
+        Called every frame by DearPyGui loop
         """
-        if not self.is_active:
-            return
-        
-        # 1. PROXY ALGORITHM (God-Object for sphere; generalize for custom model)
-        dist = math.sqrt(x*x + y*y + z*z)
+        # 1. Update Cursor Position (Red Sphere)
+        # translate to new position
+        current_center = self.cursor_mesh.center
+        new_center = [x, y, z]
+        translation_vector = [nc - cc for nc, cc in zip(new_center, current_center)]
 
-        # Calculate proxy position (where the 'ghost' cursor should be)
+        # Translate the mesh (inplace=True modifies the original mesh)
+        self.cursor_mesh.translate(translation_vector, inplace=True)
+
+        #self.cursor_mesh.center = [x, y, z]
+        
+        # 2. Update Proxy Position (Optional Visualization)
+        # If you want to visualize the math from the previous step
+        dist = np.sqrt(x*x + y*y + z*z)
         if dist < self.sphere_radius:
-            # The user is INSIDE the sphere -> push them out
-            # Proxy stays on surface
-            scale_factor = self.sphere_radius / dist
-            self.proxy_x = x * scale_factor
-            self.proxy_y = y * scale_factor
-            self.proxy_z = z * scale_factor
-
-            # 2. TEXTURE / DIAGNOSIS
-            # If we are "touching" the sphere, check for a "tumor"
-            # (Example: A hard spot at X > 20)
-            k_current = self.stiffness
-            if x > 2:
-                k_current *= 2.0  # Tumor is 2x harder
-
-            # 3. SEND FORCE COMMAND
-            # Send proxy position and stiffness; Squirrel computes F = -k * (pos - proxy)
-            cmd = {
-                "type": 6,
-                "payload": [self.proxy_x, self.proxy_y, self.proxy_z, k_current]
-            }
-            self.queue.put(cmd)
-
+            self.actor_sphere.prop.opacity = 0.8 # Make sphere solid when touching
+            self.actor_cursor.prop.color = "red"
         else:
-            # The user is OUTSIDE -> No force
-            cmd = {
-                "type": 7,
-                "payload": [0.0]
-            }
-            self.queue.put(cmd)
-            # Reset proxy to user position for visualization
-            self.proxy_x, self.proxy_y, self.proxy_z = x, y, z
+            self.actor_sphere.prop.opacity = 0.3 # Ghostly when safe
+            self.actor_cursor.prop.color = "blue"
 
-        # 4. VISUALIZATION
-        self.draw_sphere()
-
-    def draw_sphere(self):
-        # Clear and redraw 3D scene
-        dpg.delete_item("3d_scene", children_only=True)
-        
-        # Draw 3D sphere primitive (center at origin, radius in world units)
-        dpg.draw_sphere(center=(0, 0, 0), radius=self.sphere_radius, color=(0, 255, 0), parent="3d_scene")
-        
-        # Draw proxy position (God-Object) as a small sphere
-        dpg.draw_sphere(center=(self.proxy_x, self.proxy_y, self.proxy_z), radius=0.1, color=(0, 0, 255), parent="3d_scene")
-        
-        # Optionally draw user position (faded)
-        # dpg.draw_sphere(center=(x, y, z), radius=0.05, color=(255, 0, 0, 128), parent="3d_scene")
-        
-        # For custom 3D models: If self.model_data is loaded (e.g., list of triangles), draw them here
-        # Example: for face in self.model_data: dpg.draw_triangle(face[0], face[1], face[2], parent="3d_scene")
+        # 3. CRITICAL: Tell PyVista to render one frame
+        # This keeps the 3D window alive and responsive
+        self.plotter.update()

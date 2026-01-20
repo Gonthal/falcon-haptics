@@ -823,12 +823,34 @@ function HapticsThink (deviceHandle)
 	}
 
 	if (gIsModelActive) {
-		// Send proxy command if inside model
+		// Calculate the proxy
 		local proxy = computeProxy(gPosition, gModelData);
+
+		// Calculate force
+		// Note: vector direction matters. We want to pull TOWARDS the proxy.
+		local k = gModelData.stiffness;
+		local k_damp = 15.0; // Damping to prevent buzzing
+
+		local fx = (proxy.x - gPosition.x) * k;
+		local fy = (proxy.y - gPosition.y) * k;
+		local fz = (proxy.z - gPosition.z) * k;
+
+		// Apply damping (resistance to velocity)
+		fx = fx - (velocity.x * k_damp);
+		fy = fy - (velocity.y * k_damp);
+		fz = fz - (velocity.z * k_damp);
+
+		// Apply to Falcon
+		// Only apply force if we are actually penetrating (or just always apply to attract)
+		// For a solid wall, we usually only push if inside.
+
 		local dist = calc_3d_distance(gPosition, proxy);
-		if (dist < 0.01) { // Inside threshold
-			local cmd = {type = 6, data = [proxy.x, proxy.y, proxy.z, gModelData.stiffness]};
-		}
+		// The computeProxy function returns the surface point
+		// If dist > 0, it means we are away from the surface point.
+		// But computeProxy logic usually returns 'gPosition' if we are outside
+		// Let us trust the computeProxy logic for now:
+
+		gBoundaryForce.setforce(fx, fy, fz);
 	} else if (gIsSphereActive == 0) {
 		executeCubeBoundaries(velocity);
 		executeEffect(velocity, deltaTime);
