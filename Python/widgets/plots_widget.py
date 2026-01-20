@@ -6,7 +6,7 @@ import datetime
 
 # --- Data storage ---
 # Moving window data for the live plots (fast, fixed size)
-MAX_SAMPLES = 500
+MAX_SAMPLES = 1000
 plot_t = collections.deque(maxlen=MAX_SAMPLES)
 plot_x = collections.deque(maxlen=MAX_SAMPLES)
 plot_y = collections.deque(maxlen=MAX_SAMPLES)

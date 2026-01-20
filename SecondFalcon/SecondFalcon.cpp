@@ -67,6 +67,12 @@ SQRESULT SQ_getCommand(HSQUIRRELVM v) {
 	// Pop the full message
 	FalconMessage msg = GetCommand(&FalconClientSocket);
 
+	if (msg.type == CMD_ERROR) {
+		// No message received, return null
+		sq_pushnull(v);
+		return 1;
+	}
+
 	// Create a new Squirrel table on the stack: {}
 	sq_newtable(v);
 

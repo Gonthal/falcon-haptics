@@ -7,6 +7,7 @@ from widgets.pos_widget import update_pos_display
 from widgets.plots_widget import update_plot_data
 from widgets.effects_widget import update_visualizer
 from tabs.sandbox_tab import create_sandbox_tab
+from tabs.application_tab import ApplicationTab
 
 # 1. Create the thread-safe queue that will be shared between the server and GUI
 # The server thread will 'put' data into it, and the GUI thread will 'get' data from it.
@@ -37,9 +38,9 @@ with dpg.window(label="erishito puede sher", tag="primary_window", width=1500, h
         create_sandbox_tab(parent_tab_bar="main_tab_bar", command_queue=command_queue)
 
         # Placeholder tab
-        with dpg.tab(label="Settings"):
-            dpg.add_text("This is the Settings tab")
-            dpg.add_button(label="Send test command to Falcon", callback=send_test_command)
+        with dpg.tab(label="App"):
+            app_tab = ApplicationTab(queue_to_falcon=command_queue)
+            app_tab.render()
 
 
 
@@ -88,6 +89,8 @@ while dpg.is_dearpygui_running():
         mouse_x, mouse_y = dpg.get_drawing_mouse_pos()
         # Update the shape size based on Z
         update_visualizer(x_pos=x, y_pos=y, z_pos=z)
+
+        app_tab.update_loop(x, y, z)
 
     except queue.Empty:
         # This is the nomal case when no new data has arrived since the last frame

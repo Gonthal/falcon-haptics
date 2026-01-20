@@ -118,7 +118,7 @@ static void receiver_loop() {
         hdr.type = net_to_short(hdr.type);
         hdr.len = net_to_short(hdr.len);
 
-        printf("[receiver_loop] The header is %d and len is %d.\n", hdr.type, hdr.len);
+        //printf("[receiver_loop] The header is %d and len is %d.\n", hdr.type, hdr.len);
         
         FalconMessage msg;
         msg.type = hdr.type;

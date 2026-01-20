@@ -4,7 +4,6 @@
 // Squirrel script for F-Gen plugin tutorial
 //-------------------------------------------------------------
 
-
 //========================================================
 // setup plugins
 //========================================================
@@ -76,15 +75,27 @@ gWaterMomentum <- {
 	z = 0.0
 }
 
-socket_result <- 0;
+// DEBUGGING: MESH
+gModelData <- {
+    type = "sphere",  // "sphere" or "mesh"
+    radius = 3.5,     // For sphere
+    stiffness = 5.0,  // For sphere
+    vertices = [],    // List of {x, y, z} for mesh
+    faces = []        // List of [v1, v2, v3] indices for mesh
+};
+
+gIsModelActive <- false;
 
 gCommandQueue <- CommandQueue();
 
-gKeyInput <- inputlistener();
+gIsSphereActive <- 0.0;
+
+//gKeyInput <- inputlistener();
 gScriptTime <- timekeeper();   // setup time checker, used for delta time
+gTimer <- 0.0;
 gLastTime <- 0.0;			   // time at the end of the frame, initially set to 0
-const SEND_INTERVAL = 0.01;    // Send data every 0.02 seconds (50 Hz)
-const READ_INTERVAL = 0.002	   // Read data every 0.002 seconds (500 Hz)
+const SEND_INTERVAL = 0.01;    // Send data every 0.01 seconds (100 Hz)
+//const READ_INTERVAL = 0.002	   // Read data every 0.002 seconds (500 Hz)
 gTimeSinceLastSend <- 0.0;     // time since last data send
 gTimeSinceLastRead <- 0.0;
 
@@ -275,7 +286,7 @@ function calc_2d_distance(pos1, pos2, orientation) {
 	//return sqrt(du*du + dv*dv);
 }
 
-function decodeCommand(cmd) {
+function decodeCommand(cmd, deltaTime) {
 	if (cmd.type == 100) return; // we ignore errors for now
 	print("Executing command: " + cmd.type + "\n");
 
@@ -284,13 +295,115 @@ function decodeCommand(cmd) {
 	if (cmd.type >= 0 && cmd.type <= 5) {
 		print("Command is type " + cmd.type + "\n");
 		gEffectType = cmd.type;
-	} else {
-		// executeBoundary(cmd.data)
-	}
+	} else if (cmd.type == 7) {
+		gIsSphereActive = 0.0;
+		gIsModelActive = false;	// DEBUGGING
+	} else if (cmd.type == 8) {
+		gIsSphereActive = 1.0;
+		gIsModelActive = true;	// DEBUGGING
+	} else if (cmd.type == 9) {
+		// Handle model params (legacy sphere)
+		gModelData.radius = cmd.data[0];
+		gModelData.stiffness = cmd.data[1];
+		gIsModelActive = true;
+	} else if (cmd.type == 10) {
+		// New command: Send full model data
+		// Payload: [type, radius, stiffness, vertices_flat, faces_flat]
+		// E.g., vertices_flat = [x1,y1,z1,...xn,yn,zn], faces_flat = [0,1,2, 1,2,3, ...]
+		gModelData.type = cmd.data[0]; // "sphere" or "mesh"
+		gModelData.radius = cmd.data[1];
+		gModelData.stiffness = cmd.data[2];
+		local vertices_flat = cmd.data[3];
+		local faces_flat = cmd.data[4];
 
-	// Free the first position of the queue
-	//gCommandQueue.dequeue();
+		// Rebuild vertices and faces
+		gModelData.vertices = [];
+		for (local i = 0; i < vertices_flat.len(); i += 3) {
+			gModelData.vertices.append({x = vertices_flat[i], y = vertices_flat[i+1], z = vertices_flat[i+2]});
+		}
+		gModelData.faces = [];
+		for (local i = 0; i < faces_flat.len(); i += 3) {
+			gModelData.faces.append([faces_flat[i], faces_flat[i+1], faces_flat[i+2]]);
+		}
+		gIsModelActive = true;
+		print("Model loaded: " + gModelData.type + " with " + gModelData.vertices.len() + " vertices.\n");
+	} else if (cmd.type == 6) {
+		if (gIsModelActive) {
+			// Compute proxy using model data
+			local proxy = computeProxy(gPosition, gModelData);
+			local k = gModelData.stiffness;
+			local k_damping = 15.0;
+
+			local velocity = { x = 0.0, y = 0.0, z = 0.0 };
+            if (deltaTime > 0.000001) {
+                velocity.x = (gPosition.x - gLastFramePos.x) / deltaTime;
+                velocity.y = (gPosition.y - gLastFramePos.y) / deltaTime;
+                velocity.z = (gPosition.z - gLastFramePos.z) / deltaTime;
+            }
+
+			local force = {
+                x = (proxy.x - gPosition.x) * k - velocity.x * k_damping,
+                y = (proxy.y - gPosition.y) * k - velocity.y * k_damping,
+                z = (proxy.z - gPosition.z) * k - velocity.z * k_damping
+            };
+            gBoundaryForce.setforce(force.x, force.y, force.z);
+			print("Proxy: (" + proxy.x + ", " + proxy.y + ", " + proxy.z + ")\n");
+		} else {
+			gBoundaryForce.setforce(0.0, 0.0, 0.0);
+		}
+	}
 }
+
+function computeProxy(position, model) {
+	if (model.type == "sphere") {
+		// Sphere proxy: project to surface
+		local dist = sqrt(position.x*position.x + position.y*position.y + position.z*position.z);
+		if (dist < model.radius) {
+			local scale = model.radius / dist;
+			return {x = position.x * scale, y = position.y * scale, z = position.z * scale};
+		} else {
+			return {x = position.x, y = position.y, z = position.z}; // Outside, no force
+		}
+	} else if (model.type == "mesh") {
+		// Mesh proxy: find closest point on triangles
+		local closest = {x = position.x, y = position.y, z = position.z};
+		local minDist = 999999.0;
+
+		foreach (face in model.faces) {
+			local v1 = model.vertices[face[0]];
+			local v2 = model.vertices[face[1]];
+			local v3 = model.vertices[face[2]];
+
+			// Compute closest point on triangle (simplified: barycentric or point-to-plane)
+			// For full implementation, use point-to-triangle distance (we need to add helper function)
+			local pointOnTri = closestPointOnTriangle(position, v1, v2, v3);
+			local dist = calc_3d_distance(position, pointOnTri);
+			if (dist < minDist) {
+				minDist = dist;
+				closest = pointOnTri;
+			}
+		}
+		return closest;
+	}
+	return {x = 0.0, y = 0.0, z = 0.0}; // Fallback
+}
+
+function closestPointOnTriangle(p, v1, v2, v3) {
+	// Simplified: project to plane and clamp to triangle
+	// Full implementation needed for production (e.g. barycentric coords)
+	local normal = cross(subtract(v2, v1), subtract(v3, v1));
+	local d = dot(normal, v1);
+	local t = (d - dot(normal, p)) / dot(normal, normal);
+	local proj = {x = p.x + t * normal.x, y = p.y + t * normal.y, z = p.z + t * normal.z};
+
+	// Clamp to triangle bounds (simplified)
+	return proj; // Placeholder; replace with proper clamping
+}
+
+// Helper functions for vectors
+function subtract(a, b) { return {x = a.x - b.x, y = a.y - b.y, z = a.z - b.z}; }
+function dot(a, b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
+function cross(a, b) { return {x = a.y*b.z - a.z*b.y, y = a.z*b.x - a.x*b.z, z = a.x*b.y - a.y*b.x}; }
 
 function executeCubeBoundaries (velocity) {
 	local forceX = 0.0;
@@ -300,7 +413,7 @@ function executeCubeBoundaries (velocity) {
 	// --- Configuration ---
 	// Distance from the center to the wall (the units are in meters)
 	const WALL_LIMIT = 0.03;
-	local outer_limit = WALL_LIMIT + gPosition.z * 0.5;
+	local outer_limit = WALL_LIMIT;// + gPosition.z * 0.5;
 
 	// Stiffness: How "hard" the wall feels (N/m)
 	// Keep it between 800 and 1200. If it starts to buzz, decrease
@@ -638,12 +751,6 @@ function HapticsInitialize (registryConfigHandle)
 {
 	print("Initialize Script\n");
 	createSocketConnection(); // SOCKET INITIALIZATION
-	// we will need to check out this whole control box thing
-	// or let it flop
-	//gTestControlBox = effectparameters(gControlBoxEffectID, gControlBoxStack);
-	//gTestControlBox.setvar("deadband", 0.4);
-	//gControlBox = controlbox(gTestControlBox, gControlBoxStack);
-	// launch the control box
 	gControlBox = controlbox(effectparameters("_DefaultControlBox", gControlBoxStack), gControlBoxStack);
 	if (gControlBox != null) {
 		setinputeffect(gControlBox);
@@ -679,23 +786,18 @@ function HapticsThink (deviceHandle)
 	local currentTime = gScriptTime.elapsedseconds();
 	local deltaTime = currentTime - gLastTime;
 
+	local startTime = time(); // T0 to calculate execution time
+
 	// --- Send position data at a fixed time ---
 	local MAX_DELTA = 0.05 // 50 ms
 	if (deltaTime > MAX_DELTA) {
 		deltaTime = MAX_DELTA;
 	}
 
-	/*gKeyInput.update();*/
-
-	// optional debug
-	// if (gFrameCounter % 100 = 0) {
-	// 	print("Delta Time: " + deltaTime + "\n");
-    //}
-
 	// Socket and command processing
 	// Drain the socket: Read ALL pending commands for this frame
 	local cmd = getCommand();
-	while (cmd.type != 100) {
+	while (cmd != null && cmd.type != 100) {
 		gCommandQueue.enqueue(cmd);
 		cmd = getCommand();
 	}
@@ -704,7 +806,7 @@ function HapticsThink (deviceHandle)
 	while (!gCommandQueue.isEmpty()) {
 		local q_item = gCommandQueue.peek();
 		gCommandQueue.dequeue();
-		decodeCommand(q_item);
+		decodeCommand(q_item, deltaTime);
 	}
 
 	// --- Read device position ---
@@ -720,8 +822,32 @@ function HapticsThink (deviceHandle)
 		velocity.z = (gPosition.z - gLastFramePos.z) / deltaTime;
 	}
 
-	executeCubeBoundaries(velocity);
-	executeEffect(velocity, deltaTime);
+	if (gIsModelActive) {
+		// Send proxy command if inside model
+		local proxy = computeProxy(gPosition, gModelData);
+		local dist = calc_3d_distance(gPosition, proxy);
+		if (dist < 0.01) { // Inside threshold
+			local cmd = {type = 6, data = [proxy.x, proxy.y, proxy.z, gModelData.stiffness]};
+		}
+	} else if (gIsSphereActive == 0) {
+		executeCubeBoundaries(velocity);
+		executeEffect(velocity, deltaTime);
+	}
+	//executeCubeBoundaries(velocity);
+	//executeEffect(velocity, deltaTime);
+
+	gScriptTime.update(); // Force a clock refresh
+	local executionTime = gScriptTime.elapsedseconds(); // T1
+
+	// DEBUGGING: Measure frequency every 1000 frames (approx once per second)
+    if (gFrameCounter % 1000 == 0) {
+        // Convert to microseconds for readability
+		print("Execution time: " + (executionTime * 100000.0) + "us\n");
+
+		// Calculate load percentage (assuming 1 ms target budget)
+		local loadPercent = (executionTime / 0.001) * 100.0;
+		print("CPU Load: " + loadPercent + " %\n");
+    }
 
 	gTimeSinceLastSend += deltaTime;
 	if (gTimeSinceLastSend >= SEND_INTERVAL) {
@@ -730,15 +856,6 @@ function HapticsThink (deviceHandle)
 		// Reset the timer. Using modulo is robust for very slow frames.
 		gTimeSinceLastSend = gTimeSinceLastSend % SEND_INTERVAL;
 	}
-
-	// --- Keyboard presses ---
-
-	// adjust the movement effect based on button presses
-	/*if (gKeyInput.isinputdown(KEY_A)) {
-		gMovementForce.setforce(-20, 0, 0);
-	} else {
-		gMovementForce.setforce(0, 0, 0);
-	}*/
 
 	// --- Falcon button presses ---
 
@@ -763,7 +880,7 @@ function HapticsThink (deviceHandle)
 	gLastFramePos.z = gPosition.z;
 	// --- Get the next frame ready ---
 	gScriptTime.update();
-	gLastTime = gScriptTime.elapsedseconds();
+	gLastTime = gScriptTime.elapsedseconds() + executionTime;
 }
 
 
