@@ -43,10 +43,10 @@ class ApplicationTab:
                 dpg.add_separator()
                 
                 dpg.add_checkbox(label="Activate Haptics", callback=self.toggle_haptics)
-                dpg.add_slider_float(label="Radius (m)", default_value=self.sphere_radius, 
-                                     min_value=0.01, max_value=0.10, callback=self.update_params)
-                dpg.add_slider_float(label="Stiffness (N/m)", default_value=self.stiffness, 
-                                     min_value=100.0, max_value=2000.0, callback=self.update_params)
+                dpg.add_slider_float(label="Radius (m)", tag="slider_radius", default_value=self.sphere_radius, 
+                                     min_value=0.01, max_value=0.04, callback=self.update_params)
+                dpg.add_slider_float(label="Stiffness (N/m)", tag="slider_stiffness", default_value=self.stiffness, 
+                                     min_value=100.0, max_value=1000.0, callback=self.update_params)
                 
                 dpg.add_text("Note: 3D View is in the separate window.")
 
@@ -60,18 +60,13 @@ class ApplicationTab:
             self.queue.put(cmd)
 
     def update_params(self, sender, data):
-        if sender == "Radius (m)": 
+        if sender == "slider_radius": 
             self.sphere_radius = data
-            # Update visual mesh size
-            # PyVista doesn't allow changing radius easily, so we scale it
-            # Or simpler: just recreate the sphere mesh logic if needed, 
-            # but scaling the actor is faster:
-            # (Reset scale first to avoid compounding)
-            # This is a bit complex in VTK, so for a thesis, just re-generating the mesh is fine:
-            new_mesh = pv.Sphere(radius=self.sphere_radius, center=(0,0,0))
-            self.mesh_sphere.overwrite(new_mesh) # Updates the geometry in place
             
-        if sender == "Stiffness (N/m)": 
+            new_mesh = pv.Sphere(radius=self.sphere_radius, center=(0,0,0), theta_resolution=50, phi_resolution=50)
+            self.mesh_sphere.deep_copy(new_mesh)
+            
+        if sender == "stiffness_slider": 
             self.stiffness = data
             
         if self.is_active:
@@ -90,24 +85,23 @@ class ApplicationTab:
         """
         # 1. Update Cursor Position (Red Sphere)
         # translate to new position
-        current_center = self.cursor_mesh.center
-        new_center = [x, y, z]
-        translation_vector = [nc - cc for nc, cc in zip(new_center, current_center)]
+        # Move the ACTOR, not the MESH
+        # This translates the 3D object to the new coordinates instantly
+        x = x / 100
+        y = y / 100
+        z = z / 100
+        self.actor_cursor.position = (x, y, z)
 
-        # Translate the mesh (inplace=True modifies the original mesh)
-        self.cursor_mesh.translate(translation_vector, inplace=True)
-
-        #self.cursor_mesh.center = [x, y, z]
-        
-        # 2. Update Proxy Position (Optional Visualization)
-        # If you want to visualize the math from the previous step
+        # Update the visuals (Optional: Color change on touch)
         dist = np.sqrt(x*x + y*y + z*z)
+
+        #print(f"Distance: {dist} | radius: {self.sphere_radius} | Cursor: {self.actor_cursor.position}")
         if dist < self.sphere_radius:
-            self.actor_sphere.prop.opacity = 0.8 # Make sphere solid when touching
-            self.actor_cursor.prop.color = "red"
+            self.actor_cursor.prop.color = "red" # Collision
+            self.actor_sphere.prop.opacity = 0.8
         else:
-            self.actor_sphere.prop.opacity = 0.3 # Ghostly when safe
-            self.actor_cursor.prop.color = "blue"
+            self.actor_cursor.prop.color = "blue" # Safe
+            self.actor_sphere.prop.opacity = 0.3
 
         # 3. CRITICAL: Tell PyVista to render one frame
         # This keeps the 3D window alive and responsive

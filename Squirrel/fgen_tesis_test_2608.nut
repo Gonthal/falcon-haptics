@@ -306,6 +306,7 @@ function decodeCommand(cmd, deltaTime) {
 		gModelData.radius = cmd.data[0];
 		gModelData.stiffness = cmd.data[1];
 		gIsModelActive = true;
+		print("Type 9. Radius: " + gModelData.radius + ". Stiffness: " + gModelData.stiffness + " \n");
 	} else if (cmd.type == 10) {
 		// New command: Send full model data
 		// Payload: [type, radius, stiffness, vertices_flat, faces_flat]
@@ -329,6 +330,7 @@ function decodeCommand(cmd, deltaTime) {
 		print("Model loaded: " + gModelData.type + " with " + gModelData.vertices.len() + " vertices.\n");
 	} else if (cmd.type == 6) {
 		if (gIsModelActive) {
+			print("Type 6. Radius: " + gModelData.radius + ". Stiffness: " + gModelData.stiffness + " \n");
 			// Compute proxy using model data
 			local proxy = computeProxy(gPosition, gModelData);
 			local k = gModelData.stiffness;
