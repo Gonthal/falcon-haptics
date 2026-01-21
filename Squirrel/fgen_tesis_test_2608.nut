@@ -309,25 +309,39 @@ function decodeCommand(cmd, deltaTime) {
 		print("Type 9. Radius: " + gModelData.radius + ". Stiffness: " + gModelData.stiffness + " \n");
 	} else if (cmd.type == 10) {
 		// New command: Send full model data
-		// Payload: [type, radius, stiffness, vertices_flat, faces_flat]
-		// E.g., vertices_flat = [x1,y1,z1,...xn,yn,zn], faces_flat = [0,1,2, 1,2,3, ...]
-		gModelData.type = cmd.data[0]; // "sphere" or "mesh"
-		gModelData.radius = cmd.data[1];
-		gModelData.stiffness = cmd.data[2];
-		local vertices_flat = cmd.data[3];
-		local faces_flat = cmd.data[4];
+		// Payload: [Stiffness, NumVerts, v1...vn, Numfaces, f1...fn]
+		gModelData.type = "mesh";
+		gModelData.stiffness = cmd.data[0];
 
-		// Rebuild vertices and faces
+		// Parse vertices
+		local num_verts_floats = cmd.data[1].tointeger();
 		gModelData.vertices = [];
-		for (local i = 0; i < vertices_flat.len(); i += 3) {
-			gModelData.vertices.append({x = vertices_flat[i], y = vertices_flat[i+1], z = vertices_flat[i+2]});
+		local start_v = 2;
+
+		for (local i = 0; i < num_verts_floats; i += 3) {
+			local vx = cmd.data[start_v + i];
+			local vy = cmd.data[start_v + i + 1];
+			local vz = cmd.data[start_v + i + 2];
+			gModelData.vertices.append({x=vx, y=vy, z=vz});
 		}
+
+		// Parse faces
+		// The face data starts after the vertex data
+		local start_f = start_v + num_verts_floats + 1;
+		local num_faces_ints = cmd.data[start_v + num_verts_floats].tointeger();
+
 		gModelData.faces = [];
-		for (local i = 0; i < faces_flat.len(); i += 3) {
-			gModelData.faces.append([faces_flat[i], faces_flat[i+1], faces_flat[i+2]]);
+		for (local i = 0; i < num_faces_ints; i += 3) {
+			// We sent them as floats, so convert back to integer for indices
+			local f1 = cmd.data[start_f + i].tointeger();
+			local f2 = cmd.data[start_f + i + 1].tointeger();
+			local f3 = cmd.data[start_f + i + 2].tointeger();
+			gModelData.faces.append([f1, f2, f3]);
 		}
+
 		gIsModelActive = true;
-		print("Model loaded: " + gModelData.type + " with " + gModelData.vertices.len() + " vertices.\n");
+		print("Mesh Loaded: " + gModelData.faces.len() + " triangles.\n");
+
 	} else if (cmd.type == 6) {
 		if (gIsModelActive) {
 			print("Type 6. Radius: " + gModelData.radius + ". Stiffness: " + gModelData.stiffness + " \n");
@@ -357,49 +371,119 @@ function decodeCommand(cmd, deltaTime) {
 }
 
 function computeProxy(position, model) {
-	if (model.type == "sphere") {
-		// Sphere proxy: project to surface
-		local dist = sqrt(position.x*position.x + position.y*position.y + position.z*position.z);
-		if (dist < model.radius) {
-			local scale = model.radius / dist;
-			return {x = position.x * scale, y = position.y * scale, z = position.z * scale};
-		} else {
-			return {x = position.x, y = position.y, z = position.z}; // Outside, no force
-		}
-	} else if (model.type == "mesh") {
-		// Mesh proxy: find closest point on triangles
-		local closest = {x = position.x, y = position.y, z = position.z};
-		local minDist = 999999.0;
+    if (model.type == "sphere") {
+        local dist = sqrt(position.x*position.x + position.y*position.y + position.z*position.z);
+        if (dist < model.radius) {
+            local scale = model.radius / dist;
+            return {x = position.x * scale, y = position.y * scale, z = position.z * scale};
+        } else {
+            return {x = position.x, y = position.y, z = position.z};
+        }
+    } else if (model.type == "mesh") {
 
-		foreach (face in model.faces) {
-			local v1 = model.vertices[face[0]];
-			local v2 = model.vertices[face[1]];
-			local v3 = model.vertices[face[2]];
+        // --- OPTIMIZATION 1: BROAD PHASE ---
+        // If we are further than 6cm from center, don't even bother checking triangles.
+        // (Assuming model is max 4cm radius + 2cm buffer)
+        // 0.06^2 = 0.0036 // Let us try with 3cm radius + 1cm buffer
+        local distSq = position.x*position.x + position.y*position.y + position.z*position.z;
+        if (distSq > 0.000961) { // 3cm + 0.2cm buffer
+             return {x = position.x, y = position.y, z = position.z};
+        }
 
-			// Compute closest point on triangle (simplified: barycentric or point-to-plane)
-			// For full implementation, use point-to-triangle distance (we need to add helper function)
-			local pointOnTri = closestPointOnTriangle(position, v1, v2, v3);
-			local dist = calc_3d_distance(position, pointOnTri);
-			if (dist < minDist) {
-				minDist = dist;
-				closest = pointOnTri;
-			}
-		}
-		return closest;
-	}
-	return {x = 0.0, y = 0.0, z = 0.0}; // Fallback
+        local closest = {x = position.x, y = position.y, z = position.z};
+        local minDist = 999999.0;
+
+        // Pre-calculate squared cull distance (1.5 cm)
+        // Triangles further than this won't be checked accurately
+        //const CULL_DIST_SQ = 0.000225; // 0.015 * 0.015
+
+		const CULL_DIST_SQ = 0.00000625; // 0.005 * 0.005
+
+        foreach (face in model.faces) {
+            local v1 = model.vertices[face[0]];
+
+            // --- OPTIMIZATION 2: NARROW PHASE CULLING ---
+            // Fast check: Is the cursor close to the first vertex?
+            // If not, skip the expensive closestPointOnTriangle math.
+            local dx = position.x - v1.x;
+            local dy = position.y - v1.y;
+            local dz = position.z - v1.z;
+
+            // If distance^2 > 1.5cm^2, SKIP IT
+            if ((dx*dx + dy*dy + dz*dz) > CULL_DIST_SQ) {continue;}
+
+            local v2 = model.vertices[face[1]];
+            local v3 = model.vertices[face[2]];
+
+            local pointOnTri = closestPointOnTriangle(position, v1, v2, v3);
+            local dist = calc_3d_distance(position, pointOnTri);
+
+            if (dist < minDist) {
+                minDist = dist;
+                closest = pointOnTri;
+            }
+        }
+        return closest;
+    }
+    return {x = 0.0, y = 0.0, z = 0.0};
 }
 
-function closestPointOnTriangle(p, v1, v2, v3) {
-	// Simplified: project to plane and clamp to triangle
-	// Full implementation needed for production (e.g. barycentric coords)
-	local normal = cross(subtract(v2, v1), subtract(v3, v1));
-	local d = dot(normal, v1);
-	local t = (d - dot(normal, p)) / dot(normal, normal);
-	local proj = {x = p.x + t * normal.x, y = p.y + t * normal.y, z = p.z + t * normal.z};
+// Robust 'Closest Point on Triangle'
+// Based on Real-Time Collision Detection (Ericson)
+function closestPointOnTriangle(p, a, b, c) {
+    local ab = subtract(b, a);
+    local ac = subtract(c, a);
+    local ap = subtract(p, a);
 
-	// Clamp to triangle bounds (simplified)
-	return proj; // Placeholder; replace with proper clamping
+    // Check if P in vertex region outside A
+    local d1 = dot(ab, ap);
+    local d2 = dot(ac, ap);
+    if (d1 <= 0.0 && d2 <= 0.0) return a;
+
+    // Check if P in vertex region outside B
+    local bp = subtract(p, b);
+    local d3 = dot(ab, bp);
+    local d4 = dot(ac, bp);
+    if (d3 >= 0.0 && d4 <= d3) return b;
+
+    // Check if P in edge region of AB
+    local vc = d1 * d4 - d3 * d2;
+    if (vc <= 0.0 && d1 >= 0.0 && d3 <= 0.0) {
+        local v = d1 / (d1 - d3);
+        return {x = a.x + v * ab.x, y = a.y + v * ab.y, z = a.z + v * ab.z};
+    }
+
+    // Check if P in vertex region outside C
+    local cp = subtract(p, c);
+    local d5 = dot(ab, cp);
+    local d6 = dot(ac, cp);
+    if (d6 >= 0.0 && d5 <= d6) return c;
+
+    // Check if P in edge region of AC
+    local vb = d5 * d2 - d1 * d6;
+    if (vb <= 0.0 && d2 >= 0.0 && d6 <= 0.0) {
+        local w = d2 / (d2 - d6);
+        return {x = a.x + w * ac.x, y = a.y + w * ac.y, z = a.z + w * ac.z};
+    }
+
+    // Check if P in edge region of BC
+    local va = d3 * d6 - d5 * d4;
+    if (va <= 0.0 && (d4 - d3) >= 0.0 && (d5 - d6) >= 0.0) {
+        local w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+        local cb = subtract(c, b);
+        return {x = b.x + w * cb.x, y = b.y + w * cb.y, z = b.z + w * cb.z};
+    }
+
+    // P inside face region. Compute via barycentric coordinates
+    local denom = 1.0 / (va + vb + vc);
+    local v = vb * denom;
+    local w = vc * denom;
+
+    return {
+        x = a.x + ab.x * v + ac.x * w,
+        y = a.y + ab.y * v + ac.y * w,
+        z = a.z + ab.z * v + ac.z * w
+    };
 }
 
 // Helper functions for vectors
@@ -787,8 +871,6 @@ function HapticsThink (deviceHandle)
 	gScriptTime.update();
 	local currentTime = gScriptTime.elapsedseconds();
 	local deltaTime = currentTime - gLastTime;
-
-	local startTime = time(); // T0 to calculate execution time
 
 	// --- Send position data at a fixed time ---
 	local MAX_DELTA = 0.05 // 50 ms
