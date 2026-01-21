@@ -60,9 +60,9 @@ class ApplicationTab:
         # 2. DECIMATE
         self.target_mesh = raw_mesh.decimate_pro(reduction=0.9, preserve_topology=True)
         
-        if self.target_mesh.n_cells > 250:
+        if self.target_mesh.n_cells > 400:
              current_faces = self.target_mesh.n_cells
-             target_red = 1.0 - (250.0 / current_faces)
+             target_red = 1.0 - (400.0 / current_faces)
              if target_red > 0.99: target_red = 0.99
              self.target_mesh = self.target_mesh.decimate_pro(reduction=target_red, preserve_topology=True)
 
@@ -89,7 +89,7 @@ class ApplicationTab:
         payload = []
         payload.append(self.stiffness)
         payload.append(float(len(points))) 
-        payload.extend(float(p) for p in points)
+        payload.extend(points)
         payload.append(float(len(faces)))
         payload.extend([float(f) for f in faces])
         

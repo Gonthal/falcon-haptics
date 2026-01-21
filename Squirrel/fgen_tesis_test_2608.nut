@@ -86,6 +86,13 @@ gModelData <- {
 
 gIsModelActive <- false;
 
+// SPATIAL GRID SETTINGS
+const GRID_RES = 10; // 10x10x10 grid = 1000 buckets
+const WORKSPACE_SIZE = 0.12; // 12cm workspace
+const CELL_SIZE = 0.012; // Each cell is 1cm
+
+gSpatialGrid <- []; // Will be array of arrays
+
 gCommandQueue <- CommandQueue();
 
 gIsSphereActive <- 0.0;
@@ -342,6 +349,8 @@ function decodeCommand(cmd, deltaTime) {
 		gIsModelActive = true;
 		print("Mesh Loaded: " + gModelData.faces.len() + " triangles.\n");
 
+		buildSpatialGrid(gModelData);
+
 	} else if (cmd.type == 6) {
 		if (gIsModelActive) {
 			print("Type 6. Radius: " + gModelData.radius + ". Stiffness: " + gModelData.stiffness + " \n");
@@ -370,6 +379,60 @@ function decodeCommand(cmd, deltaTime) {
 	}
 }
 
+function buildSpatialGrid(model) {
+	print("Building spatial grid...\n");
+	gSpatialGrid = [];
+
+	// We initialize empty grid (Flat array for speed: Index = x + y*W + z*W*H)
+	local totalCells = GRID_RES * GRID_RES * GRID_RES;
+	for (local i = 0; i < totalCells; i += 1) {
+		gSpatialGrid.append([]); // Empty array of triangle indices
+	}
+
+	// Sort triangles into buckets
+	for (local t = 0; t < model.faces.len(); t += 1) {
+		// Get triangle vertices
+		local f = model.faces[t];
+		local v1 = model.vertices[f[0]];
+		local v2 = model.vertices[f[1]];
+		local v3 = model.vertices[f[2]];
+
+		// Find bounding box of this triangle
+		local minX = v1.x; if (v2.x < minX) minX = v2.x; if (v3.x < minX) minX = v3.x;
+        local maxX = v1.x; if (v2.x > maxX) maxX = v2.x; if (v3.x > maxX) maxX = v3.x;
+        local minY = v1.y; if (v2.y < minY) minY = v2.y; if (v3.y < minY) minY = v3.y;
+        local maxY = v1.y; if (v2.y > maxY) maxY = v2.y; if (v3.y > maxY) maxY = v3.y;
+        local minZ = v1.z; if (v2.z < minZ) minZ = v2.z; if (v3.z < minZ) minZ = v3.z;
+        local maxZ = v1.z; if (v2.z > maxZ) maxZ = v2.z; if (v3.z > maxZ) maxZ = v3.z;
+
+		// Convert world coords to grid indices
+		// Offset by +0.05 to center (assuming workspace is -0.05 to +0.05) DEBUGGING
+		local offset = WORKSPACE_SIZE / 2;
+		local startX = floor((minX + offset) / CELL_SIZE).tointeger();
+        local endX   = floor((maxX + offset) / CELL_SIZE).tointeger();
+        local startY = floor((minY + offset) / CELL_SIZE).tointeger();
+        local endY   = floor((maxY + offset) / CELL_SIZE).tointeger();
+        local startZ = floor((minZ + offset) / CELL_SIZE).tointeger();
+        local endZ   = floor((maxZ + offset) / CELL_SIZE).tointeger();
+
+		// Clamp to grid bounds (0 to 9)
+		if (startX < 0) startX = 0; if (endX >= GRID_RES) endX = GRID_RES - 1;
+        if (startY < 0) startY = 0; if (endY >= GRID_RES) endY = GRID_RES - 1;
+        if (startZ < 0) startZ = 0; if (endZ >= GRID_RES) endZ = GRID_RES - 1;
+
+		// Add this triangle index to every cell it touches
+		for (local z = startZ; z <= endZ; z+=1) {
+            for (local y = startY; y <= endY; y+=1) {
+                for (local x = startX; x <= endX; x+=1) {
+                    local idx = x + (y * GRID_RES) + (z * GRID_RES * GRID_RES);
+                    gSpatialGrid[idx].append(t);
+                }
+            }
+        }
+		print("Grid built.\n");
+	}
+}
+
 function computeProxy(position, model) {
     if (model.type == "sphere") {
         local dist = sqrt(position.x*position.x + position.y*position.y + position.z*position.z);
@@ -380,50 +443,45 @@ function computeProxy(position, model) {
             return {x = position.x, y = position.y, z = position.z};
         }
     } else if (model.type == "mesh") {
+		// Calculate which grid cell the cursor is in
+		local offset = WORKSPACE_SIZE / 2;
+		local gx = floor((position.x + offset) / CELL_SIZE).tointeger();
+        local gy = floor((position.y + offset) / CELL_SIZE).tointeger();
+        local gz = floor((position.z + offset) / CELL_SIZE).tointeger();
 
-        // --- OPTIMIZATION 1: BROAD PHASE ---
-        // If we are further than 6cm from center, don't even bother checking triangles.
-        // (Assuming model is max 4cm radius + 2cm buffer)
-        // 0.06^2 = 0.0036 // Let us try with 3cm radius + 1cm buffer
-        local distSq = position.x*position.x + position.y*position.y + position.z*position.z;
-        if (distSq > 0.000961) { // 3cm + 0.2cm buffer
-             return {x = position.x, y = position.y, z = position.z};
+		// Safety check: If outside the workspace, return default
+		if (gx < 0 || gx >= GRID_RES || gy < 0 || gy >= GRID_RES || gz < 0 || gz >= GRID_RES) {
+             return {x=position.x, y=position.y, z=position.z};
         }
 
-        local closest = {x = position.x, y = position.y, z = position.z};
+		// Get the list of triangles for this cell
+		local idx = gx + (gy * GRID_RES) + (gz * GRID_RES * GRID_RES);
+		local bucket = gSpatialGrid[idx];
+
+		// Optimization: If bucket is empty, we are in free space!
+		if (bucket.len() == 0) {
+			return {x=position.x, y=position.y, z=position.z};
+		}
+
+		local closest = {x=position.x, y=position.y, z=position.z};
         local minDist = 999999.0;
 
-        // Pre-calculate squared cull distance (1.5 cm)
-        // Triangles further than this won't be checked accurately
-        //const CULL_DIST_SQ = 0.000225; // 0.015 * 0.015
+		//Loop ONLY through the triangles in this bucket
+		foreach (triIndex in bucket) {
+			local face = model.faces[triIndex];
+			local v1 = model.vertices[face[0]];
+			local v2 = model.vertices[face[1]];
+			local v3 = model.vertices[face[2]];
 
-		const CULL_DIST_SQ = 0.00000625; // 0.005 * 0.005
+			local pointOnTri = closestPointOnTriangle(position, v1, v2, v3);
+			local dist = calc_3d_distance(position, pointOnTri);
 
-        foreach (face in model.faces) {
-            local v1 = model.vertices[face[0]];
-
-            // --- OPTIMIZATION 2: NARROW PHASE CULLING ---
-            // Fast check: Is the cursor close to the first vertex?
-            // If not, skip the expensive closestPointOnTriangle math.
-            local dx = position.x - v1.x;
-            local dy = position.y - v1.y;
-            local dz = position.z - v1.z;
-
-            // If distance^2 > 1.5cm^2, SKIP IT
-            if ((dx*dx + dy*dy + dz*dz) > CULL_DIST_SQ) {continue;}
-
-            local v2 = model.vertices[face[1]];
-            local v3 = model.vertices[face[2]];
-
-            local pointOnTri = closestPointOnTriangle(position, v1, v2, v3);
-            local dist = calc_3d_distance(position, pointOnTri);
-
-            if (dist < minDist) {
-                minDist = dist;
-                closest = pointOnTri;
-            }
-        }
-        return closest;
+			if (dist < minDist) {
+				minDist = dist;
+				closest = pointOnTri;
+			}
+		}
+		return closest;
     }
     return {x = 0.0, y = 0.0, z = 0.0};
 }
@@ -490,6 +548,7 @@ function closestPointOnTriangle(p, a, b, c) {
 function subtract(a, b) { return {x = a.x - b.x, y = a.y - b.y, z = a.z - b.z}; }
 function dot(a, b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
 function cross(a, b) { return {x = a.y*b.z - a.z*b.y, y = a.z*b.x - a.x*b.z, z = a.x*b.y - a.y*b.x}; }
+function print_vec(name, x, y, z) { print(name + " is: (" + x + ", " + y + ", " + z + ")\n"); }
 
 function executeCubeBoundaries (velocity) {
 	local forceX = 0.0;
@@ -933,8 +992,10 @@ function HapticsThink (deviceHandle)
 		// If dist > 0, it means we are away from the surface point.
 		// But computeProxy logic usually returns 'gPosition' if we are outside
 		// Let us trust the computeProxy logic for now:
+		print_vec("Force", fx, fy, fz);
 
 		gBoundaryForce.setforce(fx, fy, fz);
+
 	} else if (gIsSphereActive == 0) {
 		executeCubeBoundaries(velocity);
 		executeEffect(velocity, deltaTime);
