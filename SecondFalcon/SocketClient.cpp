@@ -50,13 +50,13 @@ int recv_all(SOCKET s, char* buf, int len) {
 }
 
 // Convenience API: build message buffer and send
-int send_message(SOCKET s, uint16_t msg_type, const void* payload, uint16_t payload_len) {
+int send_message(SOCKET s, uint16_t msg_type, const void* payload, uint32_t payload_len) {
     MsgHeader hdr;
     // Convert header type and length to network order
     // Both fields are uint16_t, so we use htons (used for unsigned shorts)
     // See https://learn.microsoft.com/es-es/windows/win32/api/winsock2/nf-winsock2-htons
     hdr.type = htons(msg_type);
-    hdr.len = htons(payload_len);
+    hdr.len = htonl(payload_len);
 
     // Create a contiguous buffer for header + payload
     // memcpy is used because we are copying raw bytes
@@ -116,7 +116,7 @@ static void receiver_loop() {
 
         std::memcpy(&hdr, hdr_buf.data(), hdrsize);
         hdr.type = net_to_short(hdr.type);
-        hdr.len = net_to_short(hdr.len);
+        hdr.len = net_to_int(hdr.len);
 
         //printf("[receiver_loop] The header is %d and len is %d.\n", hdr.type, hdr.len);
         

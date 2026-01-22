@@ -86,10 +86,16 @@ gModelData <- {
 
 gIsModelActive <- false;
 
-// SPATIAL GRID SETTINGS
-const GRID_RES = 10; // 10x10x10 grid = 1000 buckets
-const WORKSPACE_SIZE = 0.12; // 12cm workspace
-const CELL_SIZE = 0.012; // Each cell is 1cm
+// FORCE FIELD GLOBALS
+gField <- {
+	res = 16,
+	stiffness = 0,
+	min = {x=-0.06, y=-0.06, z=-0.06},
+	max = {x=0.06, y=0.06, z=0.06},
+	cellSize = {x=0.0, y=0.0, z=0.0},
+	forceField = [], // The big array of vectors
+	isActive = false
+}
 
 gSpatialGrid <- []; // Will be array of arrays
 
@@ -376,6 +382,27 @@ function decodeCommand(cmd, deltaTime) {
 		} else {
 			gBoundaryForce.setforce(0.0, 0.0, 0.0);
 		}
+	} else if (cmd.type == 11) {
+		gField.res = cmd.data[0].tointeger();
+		gField.stiffness = cmd.data[1];
+		gField.min.x = cmd.data[2]; gField.min.y = cmd.data[3]; gField.min.z = cmd.data[4];
+		gField.max.x = cmd.data[5]; gField.max.y = cmd.data[6]; gField.max.z = cmd.data[7];
+
+		// Calculate cell dimensions
+		gField.cellSize.x = (gField.max.x - gField.min.x) / (gField.res - 1)
+		gField.cellSize.y = (gField.max.y - gField.min.y) / (gField.res - 1)
+		gField.cellSize.z = (gField.max.z - gField.min.z) / (gField.res - 1)
+
+		// Copy the force vectores (starts at index 7)
+		gField.forceField = [];
+		local total_floats = cmd.data.len();
+		for (local i = 8; i < total_floats; i+=1) {
+			gField.forceField.append(cmd.data[i]);
+		}
+
+		gField.isActive = true;
+		gIsModelActive = false; // Disable old mesh logic
+		print("Force field loaded: " + (gField.forceField.len()/3) + " vectors.\n");
 	}
 }
 
@@ -850,40 +877,40 @@ function executeEffect (velocity, deltaTime) {
 function ConnectOrDisconnectStacks (deviceHandle, bConnect) {
 	// Unlocking the device list on stacks
 	gEffectsStack.setdevicelock(false);
-	gControlBoxStack.setdevicelock(false);
+	//gControlBoxStack.setdevicelock(false);
 	gMovementStack.setdevicelock(false);
 	gBoundaryStack.setdevicelock(false);
 
 	if (bConnect) {
 		// add the device to the stacks, input slot 0
 		gEffectsStack.adddevice(deviceHandle, 0);
-		gControlBoxStack.adddevice(deviceHandle, 0);
+	//	gControlBoxStack.adddevice(deviceHandle, 0);
 		gMovementStack.adddevice(deviceHandle, 0);
 		gBoundaryStack.adddevice(deviceHandle, 0);
 	} else {
 		// remove the device from the stacks, input slot 0
 		gEffectsStack.removedevice(deviceHandle, 0);
-		gControlBoxStack.removedevice(deviceHandle, 0);
+	//	gControlBoxStack.removedevice(deviceHandle, 0);
 		gMovementStack.removedevice(deviceHandle, 0);
 		gBoundaryStack.removedevice(deviceHandle, 0);
 	}
 
 	// lock the device list on the stacks
 	gEffectsStack.setdevicelock(true);
-	gControlBoxStack.setdevicelock(true);
+	//gControlBoxStack.setdevicelock(true);
 	gMovementStack.setdevicelock(true);
 	gBoundaryStack.setdevicelock(true);
 
 	if (bConnect) {
 		// connect the stacks to the device for output
 		deviceconnectstack(deviceHandle, gEffectsStack);
-		deviceconnectstack(deviceHandle, gControlBoxStack);
+	//	deviceconnectstack(deviceHandle, gControlBoxStack);
 		deviceconnectstack(deviceHandle, gMovementStack);
 		deviceconnectstack(deviceHandle, gBoundaryStack);
 	} else {
 		// disconnect the stacks from the device
 		devicedisconnectstack(deviceHandle, gEffectsStack);
-		devicedisconnectstack(deviceHandle, gControlBoxStack);
+	//	devicedisconnectstack(deviceHandle, gControlBoxStack);
 		devicedisconnectstack(deviceHandle, gMovementStack);
 		devicedisconnectstack(deviceHandle, gBoundaryStack);
 	}
@@ -965,37 +992,71 @@ function HapticsThink (deviceHandle)
 		velocity.z = (gPosition.z - gLastFramePos.z) / deltaTime;
 	}
 
-	if (gIsModelActive) {
-		// Calculate the proxy
-		local proxy = computeProxy(gPosition, gModelData);
+	if (gField.isActive) {
+		// Where are we in the grid? (0.0 to 15.0)
+		local u = (gPosition.x - gField.min.x) / gField.cellSize.x;
+		local v = (gPosition.y - gField.min.y) / gField.cellSize.y;
+		local w = (gPosition.z - gField.min.z) / gField.cellSize.z;
 
-		// Calculate force
-		// Note: vector direction matters. We want to pull TOWARDS the proxy.
-		local k = gModelData.stiffness;
-		local k_damp = 15.0; // Damping to prevent buzzing
+		// 2. Safety Check: Are we inside the mapped area?
+		if (u >= 0 && u < (gField.res - 1) &&
+			v >= 0 && v < (gField.res - 1) &&
+			w >= 0 && w < (gField.res - 1))
+		{
+			// 3. Get Indices of the 8 neighbors for Trilinear Interpolation
+			local i = floor(u).tointeger();
+			local j = floor(v).tointeger();
+			local k = floor(w).tointeger();
 
-		local fx = (proxy.x - gPosition.x) * k;
-		local fy = (proxy.y - gPosition.y) * k;
-		local fz = (proxy.z - gPosition.z) * k;
+			// Fractional part for interpolation (0.0 to 1.0)
+			local du = u - i;
+			local dv = v - j;
+			local dw = w - k;
 
-		// Apply damping (resistance to velocity)
-		fx = fx - (velocity.x * k_damp);
-		fy = fy - (velocity.y * k_damp);
-		fz = fz - (velocity.z * k_damp);
+			// Helper to get index in flat array
+			// Index = (i * Res*Res + j * Res + k) * 3
+			local getVec = function(ix, iy, iz) {
+				local idx = (ix * gField.res * gField.res + iy * gField.res + iz) * 3;
+				return {x=gField.forceField[idx], y=gField.forceField[idx+1], z=gField.forceField[idx+2]};
+			};
 
-		// Apply to Falcon
-		// Only apply force if we are actually penetrating (or just always apply to attract)
-		// For a solid wall, we usually only push if inside.
+			// Fetch forces at 8 corners
+			local c000 = getVec(i,   j,   k);
+			local c100 = getVec(i+1, j,   k);
+			local c010 = getVec(i,   j+1, k);
+			local c001 = getVec(i,   j,   k+1);
+			local c110 = getVec(i+1, j+1, k);
+			local c101 = getVec(i+1, j,   k+1);
+			local c011 = getVec(i,   j+1, k+1);
+			local c111 = getVec(i+1, j+1, k+1);
 
-		local dist = calc_3d_distance(gPosition, proxy);
-		// The computeProxy function returns the surface point
-		// If dist > 0, it means we are away from the surface point.
-		// But computeProxy logic usually returns 'gPosition' if we are outside
-		// Let us trust the computeProxy logic for now:
-		print_vec("Force", fx, fy, fz);
+			// Trilinear Interpolation
+			// Interpolate along X
+			local c00 = {x=c000.x*(1-du)+c100.x*du, y=c000.y*(1-du)+c100.y*du, z=c000.z*(1-du)+c100.z*du};
+			local c01 = {x=c001.x*(1-du)+c101.x*du, y=c001.y*(1-du)+c101.y*du, z=c001.z*(1-du)+c101.z*du};
+			local c10 = {x=c010.x*(1-du)+c110.x*du, y=c010.y*(1-du)+c110.y*du, z=c010.z*(1-du)+c110.z*du};
+			local c11 = {x=c011.x*(1-du)+c111.x*du, y=c011.y*(1-du)+c111.y*du, z=c011.z*(1-du)+c111.z*du};
 
-		gBoundaryForce.setforce(fx, fy, fz);
+			// Interpolate along Y
+			local c0 = {x=c00.x*(1-dv)+c10.x*dv, y=c00.y*(1-dv)+c10.y*dv, z=c00.z*(1-dv)+c10.z*dv};
+			local c1 = {x=c01.x*(1-dv)+c11.x*dv, y=c01.y*(1-dv)+c11.y*dv, z=c01.z*(1-dv)+c11.z*dv};
 
+			// Interpolate along Z (Final Force)
+			local fx = c0.x*(1-dw)+c1.x*dw;
+			local fy = c0.y*(1-dw)+c1.y*dw;
+			local fz = c0.z*(1-dw)+c1.z*dw;
+
+			// 4. Apply Damping (Standard Viscous)
+			// Note: Stiffness is already baked into fx/fy/fz by Python!
+			local damp = 20.0;
+			fx -= velocity.x * damp;
+			fy -= velocity.y * damp;
+			fz -= velocity.z * damp;
+
+			gBoundaryForce.setforce(fx, fy, fz);
+		} else {
+			gBoundaryForce.setforce(0.0, 0.0, 0.0);
+		}
 	} else if (gIsSphereActive == 0) {
 		executeCubeBoundaries(velocity);
 		executeEffect(velocity, deltaTime);
@@ -1007,7 +1068,7 @@ function HapticsThink (deviceHandle)
 	local executionTime = gScriptTime.elapsedseconds(); // T1
 
 	// DEBUGGING: Measure frequency every 1000 frames (approx once per second)
-    if (gFrameCounter % 1000 == 0) {
+    if (gFrameCounter % 500 == 0) {
         // Convert to microseconds for readability
 		print("Execution time: " + (executionTime * 100000.0) + "us\n");
 
@@ -1079,4 +1140,3 @@ function HapticsShutdown (  )
 	closeSocketConnection();    // Close the socket
 	print("Shutdown Script\n");
 }
-

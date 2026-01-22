@@ -38,6 +38,9 @@ inline double   net_to_double(uint64_t v) { return ntohd(v); }
 inline uint16_t short_to_net(uint16_t v) { return htons(v); }
 inline uint16_t net_to_short(uint16_t v) { return ntohs(v); }
 
+inline uint32_t int_to_net(uint32_t v) { return htonl(v); }
+inline uint32_t net_to_int(uint32_t v) { return ntohl(v); }
+
 /******************************************************************/
 /* THREAD-SAFE QUEUE DECLARATION & DEFINITION */
 /******************************************************************/

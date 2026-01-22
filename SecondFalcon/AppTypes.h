@@ -39,8 +39,8 @@ typedef enum _FalconCommandTypes : uint16_t {
 
 #pragma pack(push, 1) // Ensure no padding is added by the compiler
 typedef struct _MsgHeader {
-	uint16_t type;	 // payload length in bytes, network order
-	uint16_t len;    // network order
+	uint16_t type;	 // payload length in bytes, 2 bytes, network order
+	uint32_t len;    // 4 bytes (changed from short i.e. 2 bytes), network order
 } MsgHeader;
 #pragma pack(pop)
 

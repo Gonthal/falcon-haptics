@@ -87,9 +87,9 @@ while dpg.is_dearpygui_running():
     if latest_pos:
         x, y, z = latest_pos
         
-        update_pos_display(x, y, z)
-        update_plot_data(new_x=x, new_y=y, new_z=z)
-        update_visualizer(x_pos=x, y_pos=y, z_pos=z)
+        update_pos_display(x*100, y*100, z*100)
+        update_plot_data(new_x=x*100, new_y=y*100, new_z=z*100)
+        update_visualizer(x_pos=x*100, y_pos=y*100, z_pos=z*100)
         app_tab.update_loop(x, y, z)
 
     # Check if the PyVista window was closed by the user

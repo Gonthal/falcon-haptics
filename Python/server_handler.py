@@ -33,7 +33,7 @@ async def write_loop(writer, command_queue) -> None:
             fmt = '!' + ('f' * len(payload))
             packed_payload = struct.pack(fmt, *payload)
 
-            packed_header = struct.pack('!hh', cmd_type, len(packed_payload))
+            packed_header = struct.pack('!hI', cmd_type, len(packed_payload))
 
             # Send header + payload together and drain once
             writer.write(packed_header + packed_payload)
@@ -55,18 +55,21 @@ async def read_loop(reader, data_queue) -> None:
     while True:
         try:
             # Read the 4-byte header (type and length)
-            header_data = await reader.readexactly(4)
-            msg_type, msg_len = struct.unpack('!hh', header_data)
+            #header_data = await reader.readexactly(4)
+            #msg_type, msg_len = struct.unpack('!hh', header_data)
+            header_data = await reader.readexactly(6)
+            msg_type, msg_len = struct.unpack('!hI', header_data)
 
+            
             # Read the payload
             payload = await reader.readexactly(msg_len)
 
             if msg_type == 1: # MSG_POSITION
                 x, y, z = struct.unpack('!fff', payload)
                 # Scale the values from m to cm
-                x *= 100.0
-                y *= 100.0
-                z *= 100.0
+                #x *= 100.0
+                #y *= 100.0
+                #z *= 100.0
                 #print(f"Received position: ({x:.2f}, {y:.2f}, {z:.2f})")
                 data_queue.put((x, y, z))
 
