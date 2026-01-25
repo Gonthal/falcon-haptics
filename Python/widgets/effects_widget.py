@@ -1,6 +1,7 @@
 import dearpygui.dearpygui as dpg
 import queue
-import math
+
+from tabs.application_tab import ApplicationTab
 
 # Dictionary to enumerate the different command ids there are
 EFFECT_IDS = {
@@ -171,13 +172,13 @@ def update_visualizer(x_pos:float, y_pos:float, z_pos: float) -> None:
     # Helper text
     dpg.draw_text(pos=[10, 10], text=f"Effect: {current_effect_id}", size=15, color=(150, 150, 150, 255), parent=canvas)
 
-def create_effects_widget(parent_window, command_queue) -> None:
+def create_effects_widget(parent_window, command_queue, app_tab) -> None:
     """Creates the DearPyGUI widget for effect settings."""
 
-    with dpg.group(horizontal=True, tag="haptics_widget"):
-        # Left side: Effect Selection
-        with dpg.child_window(parent="parent_window", width=300, height=-1):
-            dpg.add_text("Select an effect")
+    with dpg.group(tag="haptics_widget"):
+        # Effect selection
+        with dpg.child_window(parent=parent_window, width=-1, height=-1):
+            dpg.add_text("Select a haptic effect")
             # Radio button for mutually exclusive selection
             dpg.add_radio_button(
                 items=list(EFFECT_IDS.keys()), # ["No Effect", "Rock", ...]
@@ -185,7 +186,7 @@ def create_effects_widget(parent_window, command_queue) -> None:
                 callback=send_effect_command,
                 user_data=command_queue,
                 tag="effects_radio_button",
-                horizontal=False # Set to True if you want them side-by-side
+                horizontal=True # Set to True for side-by-side configuration
             )
 
             dpg.add_separator()
@@ -197,16 +198,13 @@ def create_effects_widget(parent_window, command_queue) -> None:
                 dpg.add_text("Distance:")
                 dpg.add_slider_float(tag="cube_cam_dist_slider", width=-1, min_value=10.0, max_value=60.0, default_value=40.0)
 
+            dpg.add_separator()
 
-        # Right side: 3D cube visualizer
-        with dpg.child_window(width=350, height=350):
             dpg.add_text("Haptic workspace")
-
-            # Create a drawiwng canvas
             dpg.add_drawlist(width=340, height=340, tag="visualizer_canvas")
-    
 
-    #dpg.add_separator()
+            dpg.add_separator()
 
-    #dpg.add_button(label="Dummy command", width=425, callback=send_dummy_command, user_data=command_queue)
-    #with dpg.child_window(parent=parent_window, width=-1, height=105):
+            with dpg.tab_bar(tag="haptics_tab_bar"):
+                with dpg.tab(label="3D Model Loader"):
+                    app_tab.render();

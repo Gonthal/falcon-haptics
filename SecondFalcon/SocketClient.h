@@ -104,7 +104,7 @@ private:
 /* Utility functions */
 int send_all(SOCKET s, const char* buf, int len);
 int recv_all(SOCKET s, char* buf, int len);
-int send_message(SOCKET s, uint16_t msg_type, const void* payload, uint16_t payload_len);
+int send_message(SOCKET s, uint16_t msg_type, const void* payload, uint32_t payload_len);
 
 /* Main functions */
 int OpenClientConnection(SOCKET* ClientSocket);

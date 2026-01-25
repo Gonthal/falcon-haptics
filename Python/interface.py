@@ -2,6 +2,7 @@ import dearpygui.dearpygui as dpg
 import asyncio
 import threading
 import queue
+
 from server_handler import start_server
 from widgets.pos_widget import update_pos_display
 from widgets.plots_widget import update_plot_data
@@ -9,11 +10,14 @@ from widgets.effects_widget import update_visualizer
 from tabs.sandbox_tab import create_sandbox_tab
 from tabs.application_tab import ApplicationTab
 
-# 1. Create the thread-safe queue that will be shared between the server and GUI
+# Create the thread-safe queue that will be shared between the server and GUI
 # The server thread will 'put' data into it, and the GUI thread will 'get' data from it.
 # Create a separate queue to send commands from the GUI to the server
 data_queue = queue.Queue()
 command_queue = queue.Queue()
+
+# Create the application tab so you can later send it
+app_tab = ApplicationTab(queue_to_falcon=command_queue)
 
 def send_test_command():
     """
@@ -35,12 +39,12 @@ with dpg.window(label="erishito puede sher", tag="primary_window", width=1500, h
     # Create a tab bar that will hold all the main tabs
     with dpg.tab_bar(tag="main_tab_bar"):
         # Sandbox tab: kinematics, plots, haptic effects
-        create_sandbox_tab(parent_tab_bar="main_tab_bar", command_queue=command_queue)
+        create_sandbox_tab(parent_tab_bar="main_tab_bar", command_queue=command_queue, app_tab=app_tab)
 
         # Placeholder tab
-        with dpg.tab(label="App"):
-            app_tab = ApplicationTab(queue_to_falcon=command_queue)
-            app_tab.render()
+        #with dpg.tab(label="App"):
+        #    app_tab = ApplicationTab(queue_to_falcon=command_queue)
+        #    app_tab.render()
 
 
 
